@@ -1,0 +1,6 @@
+{:main wavelength.wavelength
+ :output-dir "resources/public/js/"
+ :output-to "resources/public/js/main.js"
+ :asset-path "/js/"
+ :open-url "http://localhost:8080/"
+ :watch-dirs ["src-cljs"]}
