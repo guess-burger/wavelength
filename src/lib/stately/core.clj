@@ -31,11 +31,14 @@
             reentry? false]
            (println "Entered:" state context reentry?)
            ;; FIXME: WTF is this formatting!
-           (let [{::keys [inputs transition-fn first-entry-fx]} (get plan state)
-                 _ (when (and first-entry-fx (not reentry?))
-                     (doseq [fx (first-entry-fx context)]
-                       ;(println "Apply entry fx:" fx)
-                       (apply-effect fx)))
+           (let [{::keys [inputs transition-fn on-entry]} (get plan state)
+                 ;; Apply FXs + Xform context if entering for first time
+                 context (if (and on-entry (not reentry?))
+                           (let [result (on-entry context)]
+                             ;(println result)
+                             (doseq [x (::fx result)] (apply-effect x))
+                             (or (::context result) context))
+                           context)
                  i          (inputs context)
                  ;_ (println "inputs" i)
                  msg+ch     (alts! i)

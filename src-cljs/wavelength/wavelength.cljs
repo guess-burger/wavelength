@@ -63,7 +63,7 @@
           ;; FIXME this feels rather strange! <- WHY?
           ;; FIXME maybe put this into a loading or something and get the server to confirm mode and nickname
           ;; FIXME because what happens if a nickname is already taken?
-          (swap! state assoc :game-state {:nickname nickname :mode :lobby}))
+          (swap! state assoc :game-state {:nickname nickname :mode :team-lobby}))
         (swap! state assoc :error error)))))
 
 (defn create-room []
@@ -117,25 +117,47 @@
     "Join"]])
 
 (defn team-lobby []
-  (let [{:keys [room-code left right spectators nickname]} (:game-state @state)]
+  (let [{:keys [room-code left right spectators nickname ready msg]} (:game-state @state)]
     [:<>
      [:h2 "Team Lobby"]
+     (when msg
+       [:p msg])
      [:ul
       [:li (str "Room: " room-code)]
       [:li (str "nickname: " nickname)]]
      [team-div "Left" :left left]
      [team-div "Spectators" :spectators spectators]
      [team-div "Right" :right right]
+     [:button {:disabled (not ready)
+               :on-click (fn [] (put! send-chan {:type :start}))}
+      "Start Game"]
      (for [[k v] (dissoc (:game-state @state) :room-code :left :right :spectators :nickname)]
+       [:p (str k " -> " v)])]))
+
+(def ^:private team-name
+  {:left "Left Brain"
+   :right "Right Brain"})
+
+(defn pick-psychic []
+  (let [{:keys [team-turn active]} (:game-state @state)]
+    [:<>
+     [:h2 "Pick Psychic"]
+     (if active
+       [:<>
+        [:p "Choose a Psychic for the round"]
+        [:button {:on-click #(put! send-chan {:type :pick-psychic})}
+                 "Become The Psychic"]]
+       [:p (str "Wait while " (team-name team-turn)) " chooses their Psychic"])
+     (for [[k v] (dissoc (:game-state @state) :team-turn :active)]
        [:p (str k " -> " v)])]))
 
 (defn app
   []
   (let [s (:game-state @state)]
     (case (:mode s)
-      nil [create-room]
-      :team-lobby [team-lobby]
-      ;:lobby [lobby]
+      nil           [create-room]
+      :team-lobby   [team-lobby]
+      :pick-psychic [pick-psychic]
       [:div
        [:h2 "Eh?"]
        [dump-state]])))
