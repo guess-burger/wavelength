@@ -29,31 +29,32 @@
   (go-loop [state    initial-state
             context  initial-context
             reentry? false]
-           (println "Entered:" state context reentry?)
-           ;; FIXME: WTF is this formatting!
-           (let [{::keys [inputs transition-fn on-entry]} (get plan state)
-                 ;; Apply FXs + Xform context if entering for first time
-                 context (if (and on-entry (not reentry?))
-                           (let [result (on-entry context)]
-                             ;(println result)
-                             (doseq [x (::fx result)] (apply-effect x))
-                             (or (::context result) context))
-                           context)
-                 i          (inputs context)
-                 ;_ (println "inputs" i)
-                 msg+ch     (alts! i)
-                 ;_ (println "got" msg+ch)
-                 {next-state ::state
-                  next-context ::context
-                  fx ::fx}  (transition-fn msg+ch context)
-                 next-state (if (= ::recur next-state) state next-state)
-                 ;_ (println next-state)
-                 ]
-             (doseq [x fx]
-               ;(println "fx:" x)
-               (apply-effect x))
-             ;(println "Entering:" next-state next-context)
-             (if (= ::end next-state)
-               ;; does this do anything? I don't think so
-               context
-               (recur next-state next-context (= state next-state))))))
+    (println "Entered:" state #_context reentry?)
+    ;; FIXME: WTF is this formatting!
+    ;; TODO: Probably need to handle these fns being nil better... or at all
+    (let [{::keys [inputs transition-fn on-entry]} (get plan state)
+          ;; Apply FXs + Xform context if entering for first time
+          context (if (and on-entry (not reentry?))
+                    (let [result (on-entry context)]
+                      ;(println result)
+                      (doseq [x (::fx result)] (apply-effect x))
+                      (or (::context result) context))
+                    context)
+          i          (inputs context)
+          ;_ (println "inputs" i)
+          msg+ch     (alts! i)
+          ;_ (println "got" msg+ch)
+          {next-state ::state
+           next-context ::context
+           fx ::fx}  (transition-fn msg+ch context)
+          next-state (if (= ::recur next-state) state next-state)
+          ;_ (println next-state)
+          ]
+      (doseq [x fx]
+        ;(println "fx:" x)
+        (apply-effect x))
+      ;(println "Entering:" next-state #_next-context)
+      (if (= ::end next-state)
+        ;; does this do anything? I don't think so
+        context
+        (recur next-state next-context (= state next-state))))))

@@ -147,17 +147,46 @@
         [:p "Choose a Psychic for the round"]
         [:button {:on-click #(put! send-chan {:type :pick-psychic})}
                  "Become The Psychic"]]
-       [:p (str "Wait while " (team-name team-turn)) " chooses their Psychic"])
+       [:p (str "Wait while " (team-name team-turn) " chooses their Psychic")])
      (for [[k v] (dissoc (:game-state @state) :team-turn :active)]
        [:p (str k " -> " v)])]))
+
+
+(defn pick-wavelength []
+  (let [{:keys [team-turn active wavelengths psychic]} (:game-state @state)
+        [opt1 opt2] wavelengths]
+    [:<>
+     [:h2 "Pick Wavelength"]
+     (if wavelengths
+       [:<>
+        ;;TODO allow picking but also allow getting new cards
+        [:p "Pick a Wavelength for your team to guess for"]
+        [:p (str (first opt1) " <--> " (second opt1))]
+        [:button {:on-click #(put! send-chan {:type :pick
+                                              :pick opt1})}
+                 "Pick"]
+        [:p (str (first opt2) " <--> " (second opt2))]
+        [:button {:on-click #(put! send-chan {:type :pick
+                                              :pick opt2})}
+                 "Pick"]
+        [:p ""]
+        [:button {:on-click #(put! send-chan {:type :switch-cards})}
+                 "Switch Cards"]]
+       (let [msg (if active
+                   (str psychic " is choosing a wavelength you to guess")
+                   (str psychic " is choosing a wavelength for " (team-name team-turn) " to guess"))]
+         [:<>
+          [:p msg]]))
+     [dump-state]]))
 
 (defn app
   []
   (let [s (:game-state @state)]
     (case (:mode s)
-      nil           [create-room]
-      :team-lobby   [team-lobby]
-      :pick-psychic [pick-psychic]
+      nil              [create-room]
+      :team-lobby      [team-lobby]
+      :pick-psychic    [pick-psychic]
+      :pick-wavelength [pick-wavelength]
       [:div
        [:h2 "Eh?"]
        [dump-state]])))

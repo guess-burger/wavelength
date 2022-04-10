@@ -15,7 +15,7 @@ You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for 
 * [_] Psychic Phase
   * [X] Pick a psychic
     * [X] disconnects (to fix the disconnects bug). Go back to pick
-  * [_] let them pick a card
+  * [X] let them pick a card
   * [_] let them add a clue
 * [_] Guessing Phase
 * [_] L/R Phase
