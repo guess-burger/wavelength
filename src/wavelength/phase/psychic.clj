@@ -35,6 +35,12 @@
         waiting (concat (keys (get context waiting-team)) (keys spectators))]
     [active waiting]))
 
+(defn psychic-active-rest
+  [{:keys [psychic] :as context}]
+  (let [[active waiting] (active-waiting-chs context)
+        active (remove #{psychic} active)]
+    [psychic active waiting]))
+
 (defn on-entry-pick-psychic
   [context]
 
@@ -96,11 +102,12 @@
 (defn ^:private msg-to-everyone
   [{:keys [left right spectators]} msg]
   {::st/to  (mapcat keys [left right spectators])
-   ::st/msg msg}
-  )
+   ::st/msg msg})
 
 (defn remove-player
   [context player]
+  ;; FIXME does this function really work for every phase?
+  ;; some of the phases are using :rest-of-team which isn't being updated
   (let [[name team-k next-context] (tlobby/remove-player-from context player)]
     (cond
       ;; too few players: go back to lobby
@@ -111,7 +118,6 @@
                         (dissoc :score :team-turn))
        ::st/state   ::tlobby/wait-in-lobby}
 
-      ;;TODO player was the psychic: re-pick the psychic
       (= player (:psychic next-context))
       {::st/context (dissoc next-context :psychic)
        ::st/state   ::pick-psychic}
@@ -201,19 +207,19 @@
             (= pick (second options)))
       ;; valid option chosen
       {::st/context (assoc context
-                      ;; TODO better name?
-                      :pick pick)
+                      :wavelength pick)
        ::st/state   ::pick-clue}
       ;; wasn't an option we know
       {::st/context context
        ::st/state   ::st/recur
+       ;; FIXME should this get sent to everyone while the psychic is
+       ;; still picking a clue or after the clue it picked
        ::st/fx      {::st/send [{::st/to  [(:psychic context)]
                                  ::st/msg {:type        :merge
                                            :wavelengths options}}]}})))
 
 (defn pick-wavelength-transitions
   [[msg from] {:keys [psychic] :as context}]
-
   (cond
 
     (nil? msg)
@@ -232,18 +238,93 @@
      ::st/state   ::st/recur}))
 
 (defn pick-clue-on-entry
-  [context]
-  ;; TODO
-  #_(let [target (rand)])
-  ;; FIXME it seems like xforming the context is optional
-  ;; so should be able to not set the context here
-  {::st/context context
-   })
+  [{:keys [psychic wavelength] :as context}]
+  (let [target (rand-int 100)]
+    {::st/context (assoc context
+                    :target target)
+     ::st/fx      {::st/send [{::st/to  [psychic]
+                               ::st/msg {:type       :merge
+                                         :mode       :pick-clue
+                                         :target     target
+                                         :wavelength wavelength}}]}}))
 
 (defn pick-clue-transitions
   [[msg from] {:keys [psychic] :as context}]
+  (cond
+
+    (nil? msg)
+    (remove-player context from)
+
+    (and (= :pick-clue (:type msg))
+         (= psychic from))
+    {::st/context (assoc context :clue (:pick msg))
+     ::st/state   ::team-guess}
+
+    :default
+    {::st/context context
+     ::st/state   ::st/recur}))
+
+(defn team-guess-on-entry
+  [context]
+  (let [[psychic active rest] (psychic-active-rest context)
+        _ (println psychic active rest)
+        base-msg              {:type :merge
+                               :mode :team-guess
+                               :clue (:clue context)
+                               :guess 50}]
+    {::st/context (assoc context :guess 50)
+     ::st/fx      {::st/send [{::st/to  [psychic]
+                               ::st/msg (assoc base-msg
+                                          ;; TODO maybe the role should have been sent out sooner
+                                          ;; I guess we already have the active thing... but psychic is a
+                                          ;; "special" inactive role
+                                          :role :psychic)}
+                              {::st/to  active
+                               ::st/msg (assoc base-msg
+                                          ;; if we don't send role here... won't it just accumulate junk
+                                          ;; and cause accidents where the previous psychic still has that role
+                                          ;; in their client state
+                                          :role :guesser)}
+                              {::st/to  rest
+                               ::st/msg base-msg}]}}))
+
+(defn team-guess-transitions
+  [[msg from] context]
+  (println "eh?" msg (= :pick-guess (:type msg)) (= (:guess context) (:guess msg)))
+  (cond
+
+    (nil? msg)
+    (remove-player context from)
+
+    (= :move-guess (:type msg))
+    {::st/context (assoc context :guess (:guess msg))
+     ::st/state ::st/recur
+     ::st/fx    {::st/send [(msg-to-everyone context {:type :merge, :guess (:guess msg)})]}}
+
+    (and (= :pick-guess (:type msg))
+         (= (:guess context) (:guess msg)))
+    {::st/context context
+     ::st/state   ::left-right}
+
+    :default
+    {::st/context context
+     ::st/state   ::st/recur}))
+
+(defn left-right-on-entry
+  [context]
   {::st/context context
-   ::st/state   ::st/recur})
+   ::st/fx      {::st/send [(msg-to-everyone context {:type :merge, :mode :left-right})]}})
+
+(defn left-right-transitions
+  [[msg from] context]
+  (cond
+
+    (nil? msg)
+    (remove-player context from)
+
+    :default
+    {::st/context context
+     ::st/state   ::st/recur}))
 
 (def initial-state ::pick-psychic)
 (def state-machine
@@ -252,9 +333,15 @@
                       ::st/transition-fn  #'pick-psychic-transitions}
    ::pick-wavelength {::st/inputs         #'everyone-inputs
                       ::st/transition-fn  #'pick-wavelength-transitions}
-   ;; TODO decide if the on-entry functions are better for setting up state
-   ;; or if the previous state should set it up?
    ::pick-clue       {::st/on-entry       #'pick-clue-on-entry
                       ::st/inputs         #'everyone-inputs
-                      ::st/transition-fn  #'pick-clue-transitions}})
+                      ::st/transition-fn  #'pick-clue-transitions}
+   ;; TODO decide whether to break this out... or bring everything in
+   ;; since team lobby really isn't that generic
+   ::team-guess      {::st/on-entry       #'team-guess-on-entry
+                      ::st/inputs         #'everyone-inputs
+                      ::st/transition-fn  #'team-guess-transitions}
+   ::left-right      {::st/on-entry       #'left-right-on-entry
+                      ::st/inputs         #'everyone-inputs
+                      ::st/transition-fn  #'left-right-transitions}})
 

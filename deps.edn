@@ -19,6 +19,6 @@
              :ns-default build}
   :dev      {:extra-paths ["dev"]}
   :repl/run {:main-opts ["-r" "-m" "wavelength.wavelength"]}
-  :repl/fig {:extra-deps {com.bhauman/figwheel-main       {:mvn/version "0.2.15"}
+  :repl/fig {:extra-deps {com.bhauman/figwheel-main       {:mvn/version "0.2.16"}
                           com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
              :main-opts  ["-m" "figwheel.main" "-b" "dev" "-r"]}}}

@@ -162,11 +162,11 @@
         ;;TODO allow picking but also allow getting new cards
         [:p "Pick a Wavelength for your team to guess for"]
         [:p (str (first opt1) " <--> " (second opt1))]
-        [:button {:on-click #(put! send-chan {:type :pick
+        [:button {:on-click #(put! send-chan {:type :pick-card
                                               :pick opt1})}
                  "Pick"]
         [:p (str (first opt2) " <--> " (second opt2))]
-        [:button {:on-click #(put! send-chan {:type :pick
+        [:button {:on-click #(put! send-chan {:type :pick-card
                                               :pick opt2})}
                  "Pick"]
         [:p ""]
@@ -179,6 +179,71 @@
           [:p msg]]))
      [dump-state]]))
 
+(defn pick-clue
+  []
+  (let [{:keys [target wavelength]} (:game-state @state)
+        clue (atom "")]
+    (fn []
+      [:<>
+       [:h2 "Pick clue"]
+       [:p (str (first wavelength) " <--> " (second wavelength))]
+       [:input {:type "range"
+                :min  0 :max 100 :value target
+                ;:disabled true
+                }]
+       [:p "Enter a clue"]
+       [:form {:on-submit (fn [x]
+                            (.preventDefault x)
+                            (put! send-chan {:type :pick-clue
+                                             :pick @clue}))}
+        [:label {:for "clue"} "Clue:"]
+        [:input#clue {:type    "text"
+                      :onInput (fn [x] (->> x .-target .-value (reset! clue)))}]
+        [:input {:type  "submit"
+                 :value "Submit"}]]])))
+
+(defn team-guess-guesser
+  [guess]
+  (let [slider    (r/atom guess)]
+    (fn [guess]
+      (println "GUESS!" guess)
+      (reset! slider guess)
+      [:<>
+       [:p "Discuss the clue with your team and as a team decide where on the wavelength the clue sits"]
+       [:input {:type      "range"
+                :value     @slider
+                :on-change (fn [x]
+                             (let [x (js/parseInt (.. x -target -value))]
+                               (put! send-chan {:type :move-guess :guess x})))}]
+       [:button {:on-click #(put! send-chan {:type :pick-guess, :guess guess})}
+                "Submit"]])))
+
+(defn team-guess-listener
+  [msg]
+  (let [{:keys [guess]} (:game-state @state)]
+    [:<>
+     [:p msg]
+     [:input {:type      "range"
+              :value     guess}]]))
+
+(defn team-guess
+  []
+  ;; TODO only the guessers should really be guessing
+  ;; FIXME this isn't updating passed this way
+  ;; probably because it's trying to have it's own state which doesn't
+  (let [{:keys [active role team-turn guess clue]} (:game-state @state)
+        ;; TODO trying to not get caught be old state
+        safe-role (when active role)]
+    [:div
+     [:h2 "Team Guess"]
+     [:p (str "Clue: " clue)]
+     (case safe-role
+       :psychic [team-guess-listener "Your team is guessing your clue"]
+       :guesser [team-guess-guesser guess]
+       nil [team-guess-listener (str (team-name team-turn)
+                                     " is discussing their clue and picking where on the wavelength they think it fits")])
+     [dump-state]]))
+
 (defn app
   []
   (let [s (:game-state @state)]
@@ -187,6 +252,8 @@
       :team-lobby      [team-lobby]
       :pick-psychic    [pick-psychic]
       :pick-wavelength [pick-wavelength]
+      :pick-clue       [pick-clue]
+      :team-guess      [team-guess]
       [:div
        [:h2 "Eh?"]
        [dump-state]])))
