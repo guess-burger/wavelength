@@ -2,7 +2,7 @@
   (:require [org.httpkit.client :as http]
             [clojure.string :as str]
             [cheshire.core :as json]
-            [wavelength.wavelength :as wv]))
+            [wavelength.main :as wv]))
 
 ;; telewave has the wavelengths in a js file
 (def ^:private wave-data "https://raw.githubusercontent.com/gjeuken/telewave/master/scripts/data.js")

@@ -1,7 +1,7 @@
 (ns wavelength.team-lobby-test
   (:require [clojure.test :refer :all]
             [lib.stately.core :as st]
-            [wavelength.team-lobby :as sut]))
+            [wavelength.game :as sut]))
 
 
 
@@ -59,7 +59,7 @@
                                                      :right      []
                                                      :room-code  "lobby-code"
                                                      :spectators ["foo" "bar" "baz"]
-                                                     :type       :reset}
+                                                     :type       :merge}
                                                :to  [:baz]}]}
                                 :state   ::st/recur}
              (sut/wait-in-lobby-transitions
@@ -77,10 +77,11 @@
                            :right      {},
                            :code       "lobby-code",
                            :lobby      :the-lobby},
-                 :fx      #::st{:send [#::st{:msg {:type       :merge,
-                                                   :left       [],
-                                                   :spectators ["foo"],
-                                                   :right      []},
+                 :fx      #::st{:send [#::st{:msg {:type       :merge
+                                                   :ready      false
+                                                   :left       nil
+                                                   :spectators ["foo"]
+                                                   :right      nil}
                                              :to  [:foo]}]}}
            (sut/wait-in-lobby-transitions [nil :bar] context))))
 
@@ -107,6 +108,7 @@
                            :code       "lobby-code",
                            :lobby      :the-lobby},
                  :fx      #::st{:send [#::st{:msg {:type       :merge,
+                                                   :ready      false
                                                    :left       ["bar"],
                                                    :spectators ["foo"],},
                                              :to  [:bar :foo]}]}}
@@ -124,6 +126,7 @@
                            :code       "lobby-code",
                            :lobby      :the-lobby},
                  :fx      #::st{:send [#::st{:msg {:type       :merge,
+                                                   :ready      false
                                                    :right      ["bar"],
                                                    :spectators ["foo"],},
                                              :to  [:foo :bar]}]}}
