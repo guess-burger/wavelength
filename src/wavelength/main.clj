@@ -1,4 +1,4 @@
-(ns wavelength.wavelength
+(ns wavelength.main
   (:require
     [chord.http-kit :as chord]
     [clojure.core.async :as as]
@@ -9,9 +9,7 @@
     [hiccup.util :as hcu]
     [org.httpkit.server :as http]
     [ring.middleware.defaults :refer :all]
-    [wavelength.team-lobby :as lobby]
-    [lib.stately.core :as st]
-    [wavelength.phase.psychic :as game])
+    [wavelength.game :as game])
   (:gen-class)
   (:import (java.io Writer)))
 
@@ -46,29 +44,19 @@
 (defn ^:private bidi-ch [read-ch write-ch & [{:keys [on-close]}]]
   (Bidi. read-ch write-ch on-close))
 
-
 (defn ^:private strip-message-in-ch
   "What a lovely hack to just get around chord adding :message to everything"
   [ws-ch]
+  ;; FIXME is this really the best way to do this?
   (let [in-ch (as/pipe ws-ch (as/chan 1 (map :message)))]
     (bidi-ch in-ch ws-ch)))
-
-(defn ^:private start-game?
-  [{:keys [left right] :as _context}]
-  (and (<= 2 (count left))
-       (<= 2 (count right))))
 
 ;; FIXME this is a bad name
 (defn ws-handler [nickname room-code req]
   ;; unified API for WebSocket and HTTP long polling/streaming
   (chord/with-channel req ws-ch    ; get the channel
     (let [ch (strip-message-in-ch ws-ch)]
-      (lobby/create-or-join-lobby ch
-                                  nickname
-                                  room-code
-                                  game/state-machine
-                                  game/initial-state
-                                  #'start-game?))))
+      (game/create-or-join-lobby ch nickname room-code))))
 
 (defroutes main-routes
   (GET "/" [] (index-page))
