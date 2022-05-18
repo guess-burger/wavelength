@@ -6,6 +6,9 @@
    [clojure.edn :as edn]
    [lib.stately.core :as st]))
 
+(def score-block-size 5)
+(def board-range (* 22 score-block-size))
+
 (def ^:private other-team
   {:left  :right
    :right :left})
@@ -19,12 +22,6 @@
   (let [active (keys (get context active-team))
         waiting (concat (keys (get context waiting-team)) (keys spectators))]
     [active waiting]))
-
-(defn psychic-active-rest
-  [{:keys [psychic] :as context}]
-  (let [[active waiting] (active-waiting-chs context)
-        active (remove #{psychic} active)]
-    [psychic active waiting]))
 
 (defn ignore+recur
   [context]
@@ -222,7 +219,10 @@
                           (assoc context :score score :active-team team :waiting-team other
                                          :deck (wavelength-deck)))
                         ;;starting a new round
-                        (select-keys context [:score :active-team :waiting-team :left :right :spectators :cards]))
+                        (select-keys context [:score :deck
+                                              :active-team :waiting-team
+                                              :left :right :spectators
+                                              :lobby :code]))
         active-msg    {:type :merge
                        :mode :pick-psychic
                        :active true
@@ -336,12 +336,14 @@
 
 (defn ^:private pick-card
   [context msg]
-  (let [options (->> context :deck (take 2))
+  (let [deck    (:deck context)
+        options (take 2 deck)
         pick    (:pick msg)]
     (if (or (= pick (first options))
             (= pick (second options)))
       ;; valid option chosen
       {::st/context (assoc context
+                      :deck (drop 2 deck)
                       :wavelength pick)
        ::st/state   ::pick-clue}
       ;; wasn't an option we know
@@ -408,29 +410,29 @@
 ;; they believe the target to be. Anyone on that team (except the psychic) can submit their
 ;; guess but we check their submission matches the "guess" being discussed
 
+(defn psychic-active-waiting-spectators
+  [{:keys [psychic spectators] :as context}]
+  (let [[active waiting] (active-waiting-chs context)
+        active (remove #{psychic} active)]
+    [psychic active waiting spectators]))
+
 (defn team-guess-on-entry
   [context]
-  (let [[psychic active rest] (psychic-active-rest context)
-        _ (println psychic active rest)
+  (let [[psychic active waiting spectators] (psychic-active-waiting-spectators context)
+        ;; TODO send the wavelengths here with clue
         base-msg              {:type :merge
                                :mode :team-guess
                                :clue (:clue context)
                                :guess 50}]
     {::st/context (assoc context :guess 50)
      ::st/fx      {::st/send [{::st/to  [psychic]
-                               ::st/msg (assoc base-msg
-                                          ;; TODO maybe the role should have been sent out sooner
-                                          ;; I guess we already have the active thing... but psychic is a
-                                          ;; "special" inactive role
-                                          :role :psychic)}
+                               ::st/msg (assoc base-msg :role :psychic)}
                               {::st/to  active
-                               ::st/msg (assoc base-msg
-                                          ;; if we don't send role here... won't it just accumulate junk
-                                          ;; and cause accidents where the previous psychic still has that role
-                                          ;; in their client state
-                                          :role :guesser)}
-                              {::st/to  rest
-                               ::st/msg base-msg}]}}))
+                               ::st/msg (assoc base-msg :role :guesser)}
+                              {::st/to  waiting
+                               ::st/msg (assoc base-msg :role :waiting)}
+                              {::st/to  spectators
+                               ::st/msg (assoc base-msg :role :spectator)}]}}))
 
 (defn team-guess-transitions
   [[msg from] context]
@@ -468,6 +470,50 @@
 
     (nil? msg)
     (remove-player context from)
+
+    (and (= :pick-lr (:type msg))
+         (#{:left :right} (:guess msg))
+         (contains? (get context (:waiting-team context)) from))
+    (let [;context (assoc context :lr-guess (:guess msg))
+          {:keys [target guess active-team waiting-team score]} context
+
+          lr-guess    (:guess msg)
+          guess-score (condp >= (abs (- target guess))
+                        ;; these a fixed for 5 size sections right now
+                        2  4
+                        7  3
+                        12 2
+                        0)
+          score       (update score active-team + guess-score)
+          lr-score    (if (and (not= 4 guess-score)
+                               (or (and (= lr-guess :left)
+                                        (< target guess))
+                                   (and (= lr-guess :right)
+                                        (> target guess))))
+                        1 0)
+          score       (update score waiting-team + lr-score)
+          catch-up?   (and (= 4 guess-score)
+                           (< (get score active-team) (get score waiting-team)))
+          ;; TODO probably need a tie breaker flag or something
+
+          context     (cond-> (assoc context
+                                     :score score)
+                        (not catch-up?)
+                        (assoc :active-team  waiting-team
+                               :waiting-team active-team))
+          ;; TODO decide if there is a winner
+          state       ::pick-psychic]
+      {::st/context context
+       ::st/state   state
+       ::st/fx      {::st/send [(msg-to-everyone context
+                                                 {:type   :merge
+                                                  :result {:active        active-team
+                                                           :active-score  guess-score
+                                                           :waiting-score lr-score
+                                                           ;; FIXME probably need target and guess here
+                                                           :catch-up?     catch-up?
+                                                           :target        target
+                                                           :guess         guess}})]}})
 
     :default
     {::st/context context

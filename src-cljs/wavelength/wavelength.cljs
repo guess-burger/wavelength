@@ -139,9 +139,14 @@
    :right "Right Brain"})
 
 (defn pick-psychic []
-  (let [{:keys [team-turn active]} (:game-state @state)]
+  (let [{:keys [team-turn active result]} (:game-state @state)]
     [:<>
      [:h2 "Pick Psychic"]
+     (when result
+       [:<>
+        [:h3 "Result"]
+        (for [[k v] result]
+          [:p (str "Result " k " -> " v)])])
      (if active
        [:<>
         [:p "Choose a Psychic for the round"]
@@ -244,6 +249,28 @@
                                      " is discussing their clue and picking where on the wavelength they think it fits")])
      [dump-state]]))
 
+(defn left-right
+  []
+  (let [{:keys [wavelength role guess clue]} (:game-state @state)
+        explanation (if (= :waiting role)
+                      "Decide as a team if the target is Left or Right of the other teams guess to score points"
+                      "<Other team> is deciding whether the target is left or right of <Guessing team>'s guess")]
+    [:div
+     [:h2 "Left-Right Phase"]
+     [:p (str "Clue: " clue)]
+     [:p explanation]
+     ;; FIXME this is empty for spectators... did they never get sent the wavelength?!?!?
+     ;; seems the same for the guessing members of the team!!
+     [:p (str (first wavelength) " <--> " (second wavelength))]
+     [:input {:type "range" :value guess}]
+     (when (= :waiting role)
+       [:<>
+        [:button {:on-click #(put! send-chan {:type :pick-lr, :guess :left})}
+                 "Left"]
+        [:button {:on-click #(put! send-chan {:type :pick-lr, :guess :right})}
+                 "Right"]
+        [dump-state]])]))
+
 (defn app
   []
   (let [s (:game-state @state)]
@@ -254,6 +281,7 @@
       :pick-wavelength [pick-wavelength]
       :pick-clue       [pick-clue]
       :team-guess      [team-guess]
+      :left-right      [left-right]
       [:div
        [:h2 "Eh?"]
        [dump-state]])))
