@@ -263,8 +263,14 @@
                                                           team-k (map second (get next-context team-k))})]}
        ::st/state   ::st/recur})))
 
+(defn psychic-active-waiting-spectators
+  [{:keys [psychic spectators] :as context}]
+  (let [[active waiting] (active-waiting-chs context)
+        active (remove #{psychic} active)]
+    [psychic active waiting spectators]))
+
 (defn pick-psychic
-  [from {:keys [active-team spectators waiting-team deck] :as context}]
+  [from {:keys [active-team waiting-team deck] :as context}]
   (println (assoc context :deck "<infinite!>"))
   ;; FIXME might need some print-fn for the context to prevent stately printing infinite seqs
 
@@ -287,19 +293,32 @@
   (let [team (active-team context)]
     (if (contains? (active-team context) from)
       (let [rest-team (-> team (dissoc from) keys set)
-            base-msg  {:type :merge
-                       :mode :pick-wavelength}]
-        {::st/context (assoc context
-                        :psychic from
-                        :rest-team rest-team)
+            base-msg  {:type   :merge
+                       :mode   :pick-wavelength
+                       :result nil}
+            context (assoc context
+                           :psychic from
+                           :rest-team rest-team)
+            [psychic active waiting spectators] (psychic-active-waiting-spectators context)]
+        {::st/context context
          ;; TODO need to send msg? Or make the next state do that?
          ::st/state   ::pick-wavelength
-         ::st/fx      {::st/send [{::st/to  [from]
+         ::st/fx      {::st/send [#_{::st/to  [from]
                                    ::st/msg (assoc base-msg
                                               :wavelengths (take 2 deck))}
-                                  {::st/to  (concat rest-team spectators (-> context waiting-team keys))
+                                  #_{::st/to  (concat rest-team spectators (-> context waiting-team keys))
                                    ::st/msg (assoc base-msg
-                                              :psychic (get-in context [active-team from]))}]}})
+                                              :psychic (get-in context [active-team from]))}
+                                  {::st/to  [psychic]
+                                   ::st/msg (assoc base-msg
+                                                   :wavelengths (take 2 deck)
+                                                   :role :psychic)}
+                                  {::st/to  active
+                                   ::st/msg (assoc base-msg :role :guesser)}
+                                  {::st/to  waiting
+                                   ::st/msg (assoc base-msg :role :waiting)}
+                                  {::st/to  spectators
+                                   ::st/msg (assoc base-msg :role :spectator)}]}})
       {::st/context context
        ::st/state   ::st/recur})))
 
@@ -320,7 +339,7 @@
     {::st/context context
      ::st/state   ::st/recur}))
 
-;; -- Pick Guess - Psychic Phase
+;; -- Pick Card - Psychic Phase
 ;; Here the Psychic is presented with two cards they can choose between. To make things a little easier
 ;; we also allow them to swap their cards for another 2 from the deck
 
@@ -349,8 +368,6 @@
       ;; wasn't an option we know
       {::st/context context
        ::st/state   ::st/recur
-       ;; FIXME should this get sent to everyone while the psychic is
-       ;; still picking a clue or after the clue it picked
        ::st/fx      {::st/send [{::st/to  [(:psychic context)]
                                  ::st/msg {:type        :merge
                                            :wavelengths options}}]}})))
@@ -410,29 +427,15 @@
 ;; they believe the target to be. Anyone on that team (except the psychic) can submit their
 ;; guess but we check their submission matches the "guess" being discussed
 
-(defn psychic-active-waiting-spectators
-  [{:keys [psychic spectators] :as context}]
-  (let [[active waiting] (active-waiting-chs context)
-        active (remove #{psychic} active)]
-    [psychic active waiting spectators]))
-
 (defn team-guess-on-entry
   [context]
-  (let [[psychic active waiting spectators] (psychic-active-waiting-spectators context)
-        ;; TODO send the wavelengths here with clue
-        base-msg              {:type :merge
-                               :mode :team-guess
-                               :clue (:clue context)
-                               :guess 50}]
+  (let [base-msg {:type       :merge
+                  :mode       :team-guess
+                  :clue       (:clue context)
+                  :wavelength (:wavelength context)
+                  :guess      50}]
     {::st/context (assoc context :guess 50)
-     ::st/fx      {::st/send [{::st/to  [psychic]
-                               ::st/msg (assoc base-msg :role :psychic)}
-                              {::st/to  active
-                               ::st/msg (assoc base-msg :role :guesser)}
-                              {::st/to  waiting
-                               ::st/msg (assoc base-msg :role :waiting)}
-                              {::st/to  spectators
-                               ::st/msg (assoc base-msg :role :spectator)}]}}))
+     ::st/fx      {::st/send [(msg-to-everyone context base-msg)]}}))
 
 (defn team-guess-transitions
   [[msg from] context]

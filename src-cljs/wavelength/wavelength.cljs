@@ -158,11 +158,11 @@
 
 
 (defn pick-wavelength []
-  (let [{:keys [team-turn active wavelengths psychic]} (:game-state @state)
+  (let [{:keys [team-turn role wavelengths psychic]} (:game-state @state)
         [opt1 opt2] wavelengths]
     [:<>
      [:h2 "Pick Wavelength"]
-     (if wavelengths
+     (if (= :psychic role)
        [:<>
         ;;TODO allow picking but also allow getting new cards
         [:p "Pick a Wavelength for your team to guess for"]
@@ -177,7 +177,7 @@
         [:p ""]
         [:button {:on-click #(put! send-chan {:type :switch-cards})}
                  "Switch Cards"]]
-       (let [msg (if active
+       (let [msg (if (= :guesser role)
                    (str psychic " is choosing a wavelength you to guess")
                    (str psychic " is choosing a wavelength for " (team-name team-turn) " to guess"))]
          [:<>
@@ -211,7 +211,6 @@
   [guess]
   (let [slider    (r/atom guess)]
     (fn [guess]
-      (println "GUESS!" guess)
       (reset! slider guess)
       [:<>
        [:p "Discuss the clue with your team and as a team decide where on the wavelength the clue sits"]
@@ -233,7 +232,6 @@
 
 (defn team-guess
   []
-  ;; TODO only the guessers should really be guessing
   ;; FIXME this isn't updating passed this way
   ;; probably because it's trying to have it's own state which doesn't
   (let [{:keys [active role team-turn guess clue]} (:game-state @state)
