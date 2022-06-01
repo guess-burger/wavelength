@@ -16,9 +16,8 @@
 (defn index-page []
   (hc/html
     [:head
-     [:title "Hello test"]]
+     [:title "Wavelength"]]
     [:body
-     [:h1 "hello world"]
      [:div#container]
      [:script {:type "text/javascript", :src (hcu/to-uri "/js/main.js")}]]))
 

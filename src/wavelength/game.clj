@@ -215,7 +215,7 @@
                         ;; starting a game from a lobby
                         (let [team (rand-nth [:left :right])
                               other (other-team team)
-                              score (update {:left 0 :right 0} team inc)]
+                              score (update {:left 0 :right 0} other inc)]
                           (assoc context :score score :active-team team :waiting-team other
                                          :deck (wavelength-deck)))
                         ;;starting a new round
@@ -293,9 +293,9 @@
   (let [team (active-team context)]
     (if (contains? (active-team context) from)
       (let [rest-team (-> team (dissoc from) keys set)
-            base-msg  {:type   :merge
-                       :mode   :pick-wavelength
-                       :result nil}
+            base-msg  {:type    :merge
+                       :mode    :pick-wavelength
+                       :psychic (get-in context [active-team from])}
             context (assoc context
                            :psychic from
                            :rest-team rest-team)
@@ -312,7 +312,8 @@
                                   {::st/to  [psychic]
                                    ::st/msg (assoc base-msg
                                                    :wavelengths (take 2 deck)
-                                                   :role :psychic)}
+                                                   :role :psychic
+                                                   :result nil)}
                                   {::st/to  active
                                    ::st/msg (assoc base-msg :role :guesser)}
                                   {::st/to  waiting
@@ -397,14 +398,17 @@
 
 (defn pick-clue-on-entry
   [{:keys [psychic wavelength] :as context}]
-  (let [target (rand-int 100)]
+  (let [target (rand-int board-range)]
     {::st/context (assoc context
                     :target target)
      ::st/fx      {::st/send [{::st/to  [psychic]
                                ::st/msg {:type       :merge
                                          :mode       :pick-clue
                                          :target     target
-                                         :wavelength wavelength}}]}}))
+                                         :wavelength wavelength}}
+                              ;; TODO could send a message to others to update them on
+                              ;; picking a clue
+                              ]}}))
 
 (defn pick-clue-transitions
   [[msg from] {:keys [psychic] :as context}]
@@ -433,8 +437,9 @@
                   :mode       :team-guess
                   :clue       (:clue context)
                   :wavelength (:wavelength context)
-                  :guess      50}]
-    {::st/context (assoc context :guess 50)
+                  :guess      (/ board-range 2)
+                  :result     nil}]
+    {::st/context (assoc context :guess (/ board-range 2))
      ::st/fx      {::st/send [(msg-to-everyone context base-msg)]}}))
 
 (defn team-guess-transitions
@@ -478,7 +483,7 @@
          (#{:left :right} (:guess msg))
          (contains? (get context (:waiting-team context)) from))
     (let [;context (assoc context :lr-guess (:guess msg))
-          {:keys [target guess active-team waiting-team score]} context
+          {:keys [target guess active-team waiting-team score psychic]} context
 
           lr-guess    (:guess msg)
           guess-score (condp >= (abs (- target guess))
@@ -513,10 +518,11 @@
                                                   :result {:active        active-team
                                                            :active-score  guess-score
                                                            :waiting-score lr-score
-                                                           ;; FIXME probably need target and guess here
                                                            :catch-up?     catch-up?
                                                            :target        target
-                                                           :guess         guess}})]}})
+                                                           :guess         guess
+                                                           :psychic       (get-in context [active-team psychic])
+                                                           :clue          (:clue context)}})]}})
 
     :default
     {::st/context context

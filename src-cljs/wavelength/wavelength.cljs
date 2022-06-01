@@ -73,32 +73,20 @@
                      (str/replace #"^http" "ws")
                      (str "/lobby"))]
     (fn []
-      [:<>
-       [:form {:on-submit (fn [x]
-                            (.preventDefault x)
-                            (start-echo url @nickname @room))}
-        [:label {:for "nickname"} "Nickname:"]
-        [:input#nickname {:type    "text"
-                          :onInput (fn [x] (->> x .-target .-value (reset! nickname)))}]
-        [:label {:for "room"} "Room Code:"]
-        [:input#room {:type "text"
-                      :onInput (fn [x] (->> x .-target .-value (reset! room)))}]
-        [:input {:type  "submit"
-                 :value "Submit"}]]])))
-
-;; TODO remove this
-(defn lobby []
-  (let [{:keys [room-code members admin nickname]} (:game-state @state)]
-    [:<>
-     [:h2 (str "Room: " room-code)]
-     [:h2 (str "Members: " members)]
-     (when (= nickname admin)
-       [:button {:type     "button"
-                 :on-click #(put! send-chan {:type :start :message "hello"})} "Start"])
-     [:button {:type     "button"
-               :on-click (fn []
-                           (put! send-chan {:type :leave})
-                           (reset! state {}))} "Bye"]]))
+      [:div {:style {:display "grid"
+                     :grid-template-columns "1fr"
+                     :justify-items "center"}}
+       [:h1 #_{:style {:text-align "center"}} "Wavelength"]
+       [:label {:for "nickname"} "Nickname"]
+       [:input#nickname {:style {:margin-bottom "1em"}
+                         :type    "text"
+                         :onInput (fn [x] (->> x .-target .-value (reset! nickname)))}]
+       [:label {:for "room"} "Room Code"]
+       [:input#room {:style {:margin-bottom "1em"}
+                     :type "text"
+                     :onInput (fn [x] (->> x .-target .-value (reset! room)))}]
+       [:button {:on-click #(start-echo url @nickname @room)}
+        "Submit"]])))
 
 (defn dump-state []
   [:<>
@@ -106,83 +94,197 @@
      [:p (str k " -> " v)])])
 
 (defn- team-div
-  [team-name team-key players]
-  [:div
-   [:p team-name]
-   [:ul
+  [team-name team-key players pos]
+  [:<>
+   [:p {:style {:grid-row 1 :grid-column pos}} team-name]
+   [:div {:style {:grid-row 2 :grid-column pos}}
+    [:button
+     {:on-click (fn [] (put! send-chan {:type :pick-team
+                                        :team team-key}))}
+     "Join"]]
+   [:div {:style {:grid-row 3 :grid-column pos}}
     (for [player players]
-      [:li player])]
-   [:button {:on-click (fn [] (put! send-chan {:type :pick-team
-                                               :team team-key}))}
-    "Join"]])
+      [:p player])]])
 
 (defn team-lobby []
   (let [{:keys [room-code left right spectators nickname ready msg]} (:game-state @state)]
     [:<>
-     [:h2 "Team Lobby"]
+     [:h1 {:style {:text-align "center"}}
+      "Wavelength"]
      (when msg
        [:p msg])
      [:ul
       [:li (str "Room: " room-code)]
       [:li (str "nickname: " nickname)]]
-     [team-div "Left" :left left]
-     [team-div "Spectators" :spectators spectators]
-     [team-div "Right" :right right]
-     [:button {:disabled (not ready)
-               :on-click (fn [] (put! send-chan {:type :start}))}
-      "Start Game"]
-     (for [[k v] (dissoc (:game-state @state) :room-code :left :right :spectators :nickname)]
+     [:div {:style {:display "grid"
+                    :grid-template-columns "repeat(3, 1fr)"
+                    :justify-items "center"}}
+      [team-div "Left Brain" :left left 1]
+      [team-div "Spectators" :spectators spectators 2]
+      [team-div "Right Brain" :right right 3]
+      [:div {:style    {:grid-column 2 :grid-row 4}}
+       ;; using a div to stop the button expanding to fill grid
+       ;; Probably a better way of doing that
+       [:button {:disabled (not ready)
+                 :on-click (fn [] (put! send-chan {:type :start}))}
+        "Start Game"]]]
+     #_(for [[k v] (dissoc (:game-state @state) :room-code :left :right :spectators :nickname)]
        [:p (str k " -> " v)])]))
 
 (def ^:private team-name
   {:left "Left Brain"
    :right "Right Brain"})
 
+(defn team-view
+  [{:keys [score left right spectators]}]
+  [:<>
+   [:hr]
+   [:div {:style {:display               "grid"
+                  :grid-template-columns "repeat(3, 1fr)"
+                  :justify-items         "center"}}
+    [:p (str "Left Brain: " (:left score) "/9")]
+    [:p (str (if (number? spectators) spectators (count spectators)) " Spectators")]
+    [:p (str "Right Brain: " (:right score) "/9")]
+    [:div
+     (for [player left]
+       [:p player])]
+    [:div {:style {:grid-column 3}}
+     (for [player right]
+       [:p player])]]])
+
+;; FIXME need a better name
+(defn thinger
+  "This is 'good enough' for now. It isn't perfect but that due to the way that browsers choose to render
+   their sliders so the only way to really get around that will be to make a custom slider component.
+   Or use on that works how I need it "
+  [wavelength clue guess target on-change]
+  [:div {:style {:display               "grid"
+                 :grid-template-columns "repeat(3, 1fr)"
+                 :justify-items         "center"}}
+   [:p {:style {:grid-row 1 :grid-column 1}}
+    (first wavelength)]
+   [:p {:style {:grid-row 1 :grid-column 3}}
+    (second wavelength)]
+   [:div {:style {:grid-row              2
+                  :width                 "100%"
+                  :grid-column           "1 / 4"
+                  :display               "grid"
+                  :grid-template-columns "repeat(220, 1fr)"
+                  :justify-items         "center"}}
+    [:input {:style     {:width       "100%"
+                         :grid-column " 2 / 220"
+                         :grid-row    2
+                         :z-index     5}
+             :type      "range"
+             :max       109
+             :value     guess
+             :on-change on-change
+             }]
+    (when target
+      (let [centre (* 2 (+ 1 target))]
+        [:<>
+         [:div {:style {:background-color "SeaGreen"
+                        :grid-row         "1 / 3"
+                        :grid-column      (str (max 1 (- centre 5)) " / " (min 221 (+ centre 5)))
+                        :width            "100%"
+                        :z-index          4}}]
+         [:div {:style {:background-color "Orange"
+                        :grid-row         "1 / 3"
+                        :grid-column      (str (max 1 (- centre 15)) " / " (min 221 (+ centre 15)))
+                        :width            "100%"
+                        :z-index          3}}]
+         [:div {:style {:background-color "FireBrick"
+                        :grid-row         "1 / 3"
+                        :grid-column      (str (max 1 (- centre 25)) " / " (min 221 (+ centre 25)))
+                        :width            "100%"
+                        :z-index          2}}]]))]])
+
+(defn psychics-clue
+  [name clue]
+  [:p {:style {:text-align "center"}}
+   (str name "'s clue: ")
+   [:strong clue]])
+
+(def other-team
+  {:left  :right
+   :right :left})
+
+(defn waiting-screen
+  [{:keys [team-turn result wavelength] :as game-state} content]
+  [:<>
+   (when result
+     (let [{:keys [guess target active-score waiting-score catch-up? psychic clue]} result
+           active-name (team-name team-turn)
+           waiting-name (-> team-turn other-team team-name) ]
+       [:<>
+        [psychics-clue psychic clue]
+        [thinger wavelength nil guess target nil]
+        #_[:h3 "Result"]
+        [:p {:style {:text-align "center"}}
+         (str active-name " scored " active-score " points")]
+        (when (= 1 waiting-score)
+          [:p {:style {:text-align "center"}}
+           (str waiting-name " scored 1 point for their counter guess")])
+        (when catch-up?
+          [:p {:style {:text-align "center"}}
+           (str "Catch rule in play, " active-name " goes again")])
+        [:hr]]))
+   [:div {:style {:display               "grid"
+                  :grid-template-columns "1fr"
+                  :justify-items         "center"}}
+    content]
+   [team-view game-state]])
+
 (defn pick-psychic []
-  (let [{:keys [team-turn active result]} (:game-state @state)]
+  (let [{:keys [team-turn active result wavelength] :as gs} (:game-state @state)]
     [:<>
-     [:h2 "Pick Psychic"]
-     (when result
-       [:<>
-        [:h3 "Result"]
-        (for [[k v] result]
-          [:p (str "Result " k " -> " v)])])
-     (if active
-       [:<>
-        [:p "Choose a Psychic for the round"]
-        [:button {:on-click #(put! send-chan {:type :pick-psychic})}
-                 "Become The Psychic"]]
-       [:p (str "Wait while " (team-name team-turn) " chooses their Psychic")])
-     (for [[k v] (dissoc (:game-state @state) :team-turn :active)]
-       [:p (str k " -> " v)])]))
+     #_[:h2 "Pick Psychic"]
+     [waiting-screen
+      gs
+      [:div {:style {:display               "grid"
+                     :grid-template-columns "1fr"
+                     :justify-items         "center"}}
+       (if active
+         [:<>
+          [:p "Choose a Psychic for the round"]
+          [:button {:on-click #(put! send-chan {:type :pick-psychic})}
+           "Become The Psychic"]]
+         [:p (str "Wait while " (team-name team-turn) " chooses their Psychic")])]]
+     #_[dump-state]]))
 
 
 (defn pick-wavelength []
-  (let [{:keys [team-turn role wavelengths psychic]} (:game-state @state)
+  (let [{:keys [team-turn role wavelengths psychic] :as gs} (:game-state @state)
         [opt1 opt2] wavelengths]
     [:<>
-     [:h2 "Pick Wavelength"]
+     #_[:h2 "Pick Wavelength"]
      (if (= :psychic role)
        [:<>
-        ;;TODO allow picking but also allow getting new cards
-        [:p "Pick a Wavelength for your team to guess for"]
-        [:p (str (first opt1) " <--> " (second opt1))]
-        [:button {:on-click #(put! send-chan {:type :pick-card
-                                              :pick opt1})}
-                 "Pick"]
-        [:p (str (first opt2) " <--> " (second opt2))]
-        [:button {:on-click #(put! send-chan {:type :pick-card
-                                              :pick opt2})}
-                 "Pick"]
-        [:p ""]
-        [:button {:on-click #(put! send-chan {:type :switch-cards})}
-                 "Switch Cards"]]
-       (let [msg (if (= :guesser role)
-                   (str psychic " is choosing a wavelength you to guess")
-                   (str psychic " is choosing a wavelength for " (team-name team-turn) " to guess"))]
-         [:<>
-          [:p msg]]))
-     [dump-state]]))
+        [:div {:style {:display               "grid"
+                       :grid-template-columns "repeat(2, 1fr)"
+                       :justify-items         "center"}}
+         [:p {:style {:grid-column "1 / 3"}}
+          "Pick a Wavelength for your team to guess on"]
+         [:p (str (first opt1) " <--> " (second opt1))]
+         [:button {:style    {:grid-row 3}
+                   :on-click #(put! send-chan {:type :pick-card
+                                               :pick opt1})}
+          "Pick"]
+         [:p (str (first opt2) " <--> " (second opt2))]
+         [:button {:on-click #(put! send-chan {:type :pick-card
+                                               :pick opt2})}
+          "Pick"]
+         [:button {:style    {:grid-column "1 / 3"}
+                   :on-click #(put! send-chan {:type :switch-cards})}
+          "Switch Cards"]]
+        [team-view gs]]
+       [waiting-screen gs
+        (let [msg (if (= :guesser role)
+                    (str psychic " is choosing a wavelength you to guess")
+                    (str psychic " is choosing a wavelength for " (team-name team-turn) " to guess"))]
+          [:<>
+           [:p msg]])])
+     #_[dump-state]]))
 
 (defn pick-clue
   []
@@ -190,87 +292,106 @@
         clue (atom "")]
     (fn []
       [:<>
-       [:h2 "Pick clue"]
-       [:p (str (first wavelength) " <--> " (second wavelength))]
-       [:input {:type "range"
-                :min  0 :max 100 :value target
-                ;:disabled true
-                }]
-       [:p "Enter a clue"]
-       [:form {:on-submit (fn [x]
-                            (.preventDefault x)
-                            (put! send-chan {:type :pick-clue
-                                             :pick @clue}))}
-        [:label {:for "clue"} "Clue:"]
-        [:input#clue {:type    "text"
-                      :onInput (fn [x] (->> x .-target .-value (reset! clue)))}]
-        [:input {:type  "submit"
-                 :value "Submit"}]]])))
+       #_[:h2 "Pick clue"]
+       [thinger wavelength "" target target nil]
+       [:p {:style {:text-align "center"}}
+        "Enter a clue that represents where on the wavelength the target sits"]
+       [:p {:style {:text-align "center"}}
+        "Remember you not are not allowed to communicate with your team after this point!"]
+       [:div {:style {:display               "grid"
+                      :grid-template-columns "1fr"
+                      :justify-items "center"}}
+        [:form {:on-submit (fn [x]
+                             (.preventDefault x)
+                             (put! send-chan {:type :pick-clue
+                                              :pick @clue}))}
+         #_[:label {:for "clue"} "Clue:"]
+         [:input#clue {:type    "text"
+                       :onInput (fn [x] (->> x .-target .-value (reset! clue)))}]
+         [:input {:type  "submit"
+                  :value "Submit"}]]]])))
 
 (defn team-guess-guesser
   [guess]
-  (let [slider    (r/atom guess)]
+  (let [{:keys [wavelength]} (:game-state @state)
+        slider    (r/atom guess)]
     (fn [guess]
       (reset! slider guess)
       [:<>
-       [:p "Discuss the clue with your team and as a team decide where on the wavelength the clue sits"]
-       [:input {:type      "range"
-                :value     @slider
-                :on-change (fn [x]
-                             (let [x (js/parseInt (.. x -target -value))]
-                               (put! send-chan {:type :move-guess :guess x})))}]
-       [:button {:on-click #(put! send-chan {:type :pick-guess, :guess guess})}
-                "Submit"]])))
+       [thinger wavelength nil guess nil (fn [x]
+                                           (let [x (js/parseInt (.. x -target -value))]
+                                             (put! send-chan {:type :move-guess :guess x})))]
+       [:div {:style {:display               "grid"
+                      :grid-template-columns "repeat(3, 1fr)"
+                      :justify-items         "center"}}
+        [:p {:style {:grid-row    3
+                     :grid-column "1 /4"}}
+         "Discuss the clue with your team and as a team decide where on the wavelength the clue sits"]
+        [:button {:style    {:grid-row    4
+                             :grid-column "1 /4"}
+                  :on-click #(put! send-chan {:type :pick-guess, :guess guess})}
+         "Submit"]]])))
 
 (defn team-guess-listener
   [msg]
-  (let [{:keys [guess]} (:game-state @state)]
+  (let [{:keys [guess wavelength]} (:game-state @state)]
     [:<>
-     [:p msg]
-     [:input {:type      "range"
-              :value     guess}]]))
+     [thinger wavelength nil guess nil]
+     [:p {:style {:text-align "center"}} msg]]))
 
 (defn team-guess
   []
-  ;; FIXME this isn't updating passed this way
-  ;; probably because it's trying to have it's own state which doesn't
-  (let [{:keys [active role team-turn guess clue]} (:game-state @state)
-        ;; TODO trying to not get caught be old state
+  (let [{:keys [active role team-turn guess clue psychic] :as gs} (:game-state @state)
         safe-role (when active role)]
-    [:div
-     [:h2 "Team Guess"]
-     [:p (str "Clue: " clue)]
+    [:<>
+     #_[:h2 "Team Guess"]
+     [psychics-clue psychic clue]
      (case safe-role
        :psychic [team-guess-listener "Your team is guessing your clue"]
        :guesser [team-guess-guesser guess]
        nil [team-guess-listener (str (team-name team-turn)
                                      " is discussing their clue and picking where on the wavelength they think it fits")])
-     [dump-state]]))
+     [team-view gs]
+     #_[dump-state]]))
 
 (defn left-right
   []
-  (let [{:keys [wavelength role guess clue]} (:game-state @state)
+  (let [{:keys [wavelength role guess psychic clue team-turn]} (:game-state @state)
         explanation (if (= :waiting role)
                       "Decide as a team if the target is Left or Right of the other teams guess to score points"
-                      "<Other team> is deciding whether the target is left or right of <Guessing team>'s guess")]
+                      (let [active-name (team-name team-turn)
+                            waiting-name (-> team-turn other-team team-name)]
+                        (str waiting-name
+                             " is deciding whether the target is left or right of " active-name "'s guess")))]
     [:div
-     [:h2 "Left-Right Phase"]
-     [:p (str "Clue: " clue)]
-     [:p explanation]
-     ;; FIXME this is empty for spectators... did they never get sent the wavelength?!?!?
-     ;; seems the same for the guessing members of the team!!
-     [:p (str (first wavelength) " <--> " (second wavelength))]
-     [:input {:type "range" :value guess}]
-     (when (= :waiting role)
-       [:<>
-        [:button {:on-click #(put! send-chan {:type :pick-lr, :guess :left})}
-                 "Left"]
-        [:button {:on-click #(put! send-chan {:type :pick-lr, :guess :right})}
-                 "Right"]
-        [dump-state]])]))
+     #_[:h2 "Left-Right Phase"]
+     [psychics-clue psychic clue]
+     [:div {:style {:display               "grid"
+                    :grid-template-columns "repeat(3, 1fr)"
+                    :justify-items         "center"}}
+      [:p {:style {:grid-row 1 :grid-column 1}}
+       (first wavelength)]
+      [:p {:style {:grid-row 1 :grid-column 3}}
+       (second wavelength)]
+      [:input {:style {:grid-row 2 :grid-column "1 / 4" :width "100%"}
+               :type "range" :value guess :max 110}]
+      (when (= :waiting role)
+        [:<>
+         [:button {:style {:grid-row 3 :grid-column 1}
+                   :on-click #(put! send-chan {:type :pick-lr, :guess :left})}
+          "Left"]
+         [:button {:style {:grid-row 3 :grid-column 3}
+                   :on-click #(put! send-chan {:type :pick-lr, :guess :right})}
+          "Right"]])
+      [:p {:style {:grid-row 4 :grid-column "1 / 4"}}
+       explanation]
+      #_[dump-state]]]))
 
 (defn app
   []
+  ;; FIXME probably want to look into some form of container for this
+  ;; as the grid expands across the whole screen which might not be the best
+  ;; thing to do
   (let [s (:game-state @state)]
     (case (:mode s)
       nil              [create-room]
