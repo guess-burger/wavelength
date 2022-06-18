@@ -8,67 +8,74 @@
 ;; and there are 5 scoring zones
 
 (defn create-context
-  [target guess left-score right-score active waiting]
-  {:target       target
-   :clue         "clue"
-   :guess        guess
-   :wavelength   ["left side" "right side"]
-   :score        {:left left-score :right right-score}
-   :deck         [:card-1 :card-2]
+  ([target guess left-score right-score active waiting]
+   (create-context target guess left-score right-score active waiting active))
+  ([target guess left-score right-score active waiting prev-team]
+   {:target       target
+    :clue         "clue"
+    :guess        guess
+    :wavelength   ["left side" "right side"]
+    :score        {:left left-score :right right-score}
+    :deck         [:card-1 :card-2]
 
-   :lobby        :lobby-channel
-   :code         "lobby-code"
+    :lobby        :lobby-channel
+    :code         "lobby-code"
 
-   :active-team  active
-   :waiting-team waiting
-   ;; these are junk fake values that matter here
-   :psychic      :some-one
-   :rest-team    #{:some-two}
+    :active-team  active
+    :waiting-team waiting
 
-   :left         {:left-one "left one"
-                  :left-two "left two"}
-   :spectators   {:spectator-one "spectator one"}
-   :right        {:right-one "right one"
-                  :right-two "right two"}})
+    :psychic      (if (= :left prev-team) :left-one :right-one)
+    :rest-team    (if (= :left prev-team) #{:left-two} #{:right-two})
+
+    :left         {:left-one "left one"
+                   :left-two "left two"}
+    :spectators   {:spectator-one "spectator one"}
+    :right        {:right-one "right one"
+                   :right-two "right two"}}))
 
 (defn- output
-  [context result]
-  #::st{:context context
-        :state   ::sut/pick-psychic
-        :fx      {::st/send [{::st/to  [:left-one :left-two
-                                        :right-one :right-two
-                                        :spectator-one]
-                              ::st/msg {:type  :merge
-                                        :result result}}]}})
+  ([context result]
+   (output context result ::sut/pick-psychic))
+  ([context result state]
+   #::st{:context context
+         :state   state
+         :fx      {::st/send [{::st/to  [:left-one :left-two
+                                         :right-one :right-two
+                                         :spectator-one]
+                               ::st/msg {:type   :merge
+                                         :result result}}]}}))
 
 (deftest scoring-test
   (testing "Guessing team got it exact"
     (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :left} :left-one]
                                        (create-context 20 20 1 0 :right :left))
-           (output (create-context 20 20 1 4 :left :right)
+           (output (create-context 20 20 1 4 :left :right :right)
                    {:active :right
-                   :active-score 4 :waiting-score 0
-                   :catch-up? false
-                   :target 20 :guess 20}
-                   #_{:left  0 :right 4 :catch-up? false #_:winner #_nil}))))
+                    :active-score 4 :waiting-score 0
+                    :catch-up? false
+                    :clue "clue"
+                    :psychic "right one"
+                    :target 20 :guess 20}))))
 
   (testing "Guessing team got it just in 4 point barrier"
     (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :left} :left-one]
                                        (create-context 60 58 1 0 :right :left))
-           (output (create-context 60 58 1 4 :left :right)
+           (output (create-context 60 58 1 4 :left :right :right)
                    {:active :right
-                   :active-score 4 :waiting-score 0
-                   :catch-up? false
-                   :target 60 :guess 58}
-                   #_{:left  0 :right 4 :catch-up? false #_:winner #_nil})))
+                    :active-score 4 :waiting-score 0
+                    :catch-up? false
+                    :clue "clue"
+                    :psychic "right one"
+                    :target 60 :guess 58})))
     (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :left} :left-one]
                                        (create-context 60 62 1 0 :right :left))
-           (output (create-context 60 62 1 4 :left :right)
+           (output (create-context 60 62 1 4 :left :right :right)
                    {:active :right
-                   :active-score 4 :waiting-score 0
-                   :catch-up? false
-                   :target 60 :guess 62}
-                   #_{:left  0 :right 4 :catch-up? false #_:winner #_nil}))))
+                    :active-score 4 :waiting-score 0
+                    :catch-up? false
+                    :clue "clue"
+                    :psychic "right one"
+                    :target 60 :guess 62}))))
 
   (testing "Catch-up rule"
     ;; Catch-up rule applies if you get 4 points and are still behind
@@ -76,15 +83,78 @@
                                        (create-context 60 62 0 5 :left :right))
            (output (create-context 60 62 4 5 :left :right)
                    {:active :left
-                   :active-score 4 :waiting-score 0
-                   :catch-up? true
-                   :target 60 :guess 62}
-                   #_{:left  4 :right 0 :catch-up? true #_:winner #_nil})))
+                    :active-score 4 :waiting-score 0
+                    :catch-up? true
+                    :clue "clue"
+                    :psychic "left one"
+                    :target 60 :guess 62})))
     (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :left} :right-one]
                                        (create-context 60 62 0 4 :left :right))
-           (output (create-context 60 62 4 4 :right :left)
+           (output (create-context 60 62 4 4 :right :left :left)
                    {:active :left
-                   :active-score 4 :waiting-score 0
-                   :catch-up? false
-                   :target 60 :guess 62}
-                   #_{:left  4 :right 0 :catch-up? false #_:winner #_nil})))))
+                    :active-score 4 :waiting-score 0
+                    :catch-up? false
+                    :clue "clue"
+                    :psychic "left one"
+                    :target 60 :guess 62})))))
+
+(deftest winner-test
+  (testing "Not quite"
+    (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :left} :right-one]
+                                       (create-context 62 62 5 0 :left :right))
+           (output (create-context 62 62 9 0 :right :left :left)
+                   {:active :left
+                    :active-score 4 :waiting-score 0
+                    :catch-up? false
+                    :clue "clue"
+                    :psychic "left one"
+                    :target 62 :guess 62}))))
+
+  (testing "Clear winner"
+    (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :left} :right-one]
+                                       (create-context 88 88 6 0 :left :right))
+           (output (create-context 88 88 10 0 :right :left :left)
+                   {:active :left
+                    :active-score 4 :waiting-score 0
+                    :catch-up? false
+                    :clue "clue"
+                    :psychic "left one"
+                    ;; FIXME mark that someone won!
+                    :target 88 :guess 88}
+                   ::sut/reveal))))
+
+  (testing "Both passed 10"
+    ;; team with the highest
+    (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :right} :right-one]
+                                       (create-context 88 83 8 9 :left :right))
+           (output (create-context 88 83 11 10 :right :left :left)
+                   {:active :left
+                    :active-score 3 :waiting-score 1
+                    :catch-up? false
+                    :clue "clue"
+                    :psychic "left one"
+                    ;; FIXME mark that someone won!
+                    ;; TODO not sure we need that since we could make reveal send out how won when it changes the UI
+                    :target 88 :guess 83}
+                   ::sut/reveal)))))
+
+#_(deftest tie-breaker
+  ;; If there's a tie, each team takes a final sudden death turn.
+  ;; The team that scores the most points that round wins (including the LEFT/RIGHT guess).
+  ;; If there's still a tie, repeat until a team has won.
+
+  ;; TODO need some way of marking tie breaker, and whether each team has had their turn...
+  ;; this needs to repeat until someone wins too!!!
+  (testing "entering sudden death"
+    (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :right} :right-one]
+                                       (create-context 88 83 7 9 :left :right))
+           (output (create-context 88 83 10 10 :right :left :left)
+                   {:active :left
+                    :active-score 3 :waiting-score 1
+                    :catch-up? false
+                    :clue "clue"
+                    :psychic "left one"
+                    :sudden-death true
+                    :target 88 :guess 83}))))
+
+  (is (= :foo :bar)))

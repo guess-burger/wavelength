@@ -53,6 +53,7 @@
   [url params]
   (guri/appendParamsFromMap  url (clj->js params)))
 
+;; TODO rename
 (defn start-echo [url nickname room]
   (go
     (let [{:keys [ws-channel error]} (<! (ws-ch (append-params url {:nickname nickname :room room})))]
@@ -63,6 +64,8 @@
           ;; FIXME this feels rather strange! <- WHY?
           ;; FIXME maybe put this into a loading or something and get the server to confirm mode and nickname
           ;; FIXME because what happens if a nickname is already taken?
+          ;; TODO I think the server should return the nickname (and mode) so if there are 2 users trying to use "a"
+          ;; as a username then the second returns as "a (2)"
           (swap! state assoc :game-state {:nickname nickname :mode :team-lobby}))
         (swap! state assoc :error error)))))
 
@@ -142,9 +145,9 @@
    [:div {:style {:display               "grid"
                   :grid-template-columns "repeat(3, 1fr)"
                   :justify-items         "center"}}
-    [:p (str "Left Brain: " (:left score) "/9")]
+    [:p (str "Left Brain: " (:left score) "/10")]
     [:p (str (if (number? spectators) spectators (count spectators)) " Spectators")]
-    [:p (str "Right Brain: " (:right score) "/9")]
+    [:p (str "Right Brain: " (:right score) "/10")]
     [:div
      (for [player left]
        [:p player])]
@@ -387,6 +390,23 @@
        explanation]
       #_[dump-state]]]))
 
+(defn reveal
+  []
+  (let [{:keys [winner] :as gs} (:game-state @state)]
+    [:<>
+     [waiting-screen gs
+      [:div {:style {:display               "grid"
+                     :grid-template-columns "repeat(2, 1fr)"
+                     :justify-items         "center"}}
+       [:p {:style {:grid-column "1 / 3"}}
+        (str (team-name winner) " wins!")]
+       ;; FIXME why aren't these centering?
+       [:button {:on-click #(put! send-chan {:type :play-again})}
+        "Play Again"]
+       [:button {:on-click #(put! send-chan {:type :change-teams})}
+        "Change Teams"]]]
+     [dump-state]]))
+
 (defn app
   []
   ;; FIXME probably want to look into some form of container for this
@@ -401,9 +421,10 @@
       :pick-clue       [pick-clue]
       :team-guess      [team-guess]
       :left-right      [left-right]
+      :reveal          [reveal]
       [:div
        [:h2 "Eh?"]
        [dump-state]])))
-;; eh?
+
 (dom/render [app]
           (. js/document (getElementById "container")))

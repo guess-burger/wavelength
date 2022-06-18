@@ -187,30 +187,6 @@
   ;; but then what if we play another game? Even if we went "through" a lobby
   ;; we'd probably still want to be in the same "room"
 
-  ;; lobby would have
-  {:left       {}
-   :right      {}
-   :spectators {}
-   ;; fixme maybe make lobby like this? maybe
-   :lobby-ch {}
-   :lobby-code {}
-   #_:lobby #_{:code ""
-               :join-ch ""}}
-
-  ;; and make lobby look like this
-  {:score     {:left 1
-               :right 0}
-   :active-team :right
-   :waiting-team :left}
-
-  ;; later we'll want something like
-  {:score {:left 1
-           :right 0}
-   :active-team :right
-   :waiting-team :left
-   :psychic :foo-ch
-   :rest-team [:bar-ch :foo-ch]}
-
   (let [round-context (if (nil? (:score context))
                         ;; starting a game from a lobby
                         (let [team (rand-nth [:left :right])
@@ -509,12 +485,13 @@
                         (not catch-up?)
                         (assoc :active-team  waiting-team
                                :waiting-team active-team))
-          ;; TODO decide if there is a winner
-          state       ::pick-psychic]
+          state       (if (some #(<= 10 %) (vals score)) ::reveal ::pick-psychic)]
       {::st/context context
        ::st/state   state
        ::st/fx      {::st/send [(msg-to-everyone context
                                                  {:type   :merge
+                                                  ;; FIXME does this need to send the new score?
+                                                  ;; NO! Pick psychic does it... of course
                                                   :result {:active        active-team
                                                            :active-score  guess-score
                                                            :waiting-score lr-score
@@ -527,6 +504,47 @@
     :default
     {::st/context context
      ::st/state   ::st/recur}))
+
+
+
+;; --- Reveal Phase
+
+;; Reveal might be better named as :finished as at the end of the game we kind of want people to
+;; either play again or change teams
+
+(defn reveal-on-entry
+  [{:keys [score] :as context}]
+  (let [winner (max-key second (first score) (second score))]
+    {::st/context context
+     ::st/fx      {::st/send [(msg-to-everyone context {:type   :merge
+                                                        :mode   :reveal
+                                                        :score score
+                                                        :winner (first winner)})]}}))
+
+(defn reveal-transitions
+  [[msg from] context]
+  (println msg (dissoc context :deck))
+  (cond
+
+    (nil? msg)
+    (remove-player context from)
+
+    ;; Change teams (i.e. go back to team-lobby)
+
+    ;; Play again (i.e. go back to pick psychic with no result and no score?)
+    (= :play-again (:type msg))
+    {::st/state   ::pick-psychic
+     ::st/context (dissoc context :score)
+     ::st/fx      {::st/send [(msg-to-everyone context
+                                               {:type   :merge
+                                                :result nil
+                                                :score  nil})]}}
+
+    :default
+    {::st/context context
+     ::st/state   ::st/recur}))
+
+;; ---
 
 (def state-machine
   {::wait-in-lobby   {::st/inputs         #'wait-in-lobby-inputs
@@ -545,9 +563,10 @@
                       ::st/transition-fn  #'team-guess-transitions}
    ::left-right      {::st/on-entry       #'left-right-on-entry
                       ::st/inputs         #'everyone-inputs
-                      ::st/transition-fn  #'left-right-transitions}})
-
-;; ---
+                      ::st/transition-fn  #'left-right-transitions}
+   ::reveal          {::st/on-entry       #'reveal-on-entry
+                      ::st/inputs         #'everyone-inputs
+                      ::st/transition-fn  #'reveal-transitions}})
 
 (defonce lobbies (atom {}))
 
