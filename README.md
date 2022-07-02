@@ -5,9 +5,9 @@ FIXME: my new application.
 
 ## Running
 
-Spin up a repl using `clj -M:repl/run` and that _should_ start the server on 8080
+Spin up a repl using `clj -M:repl/run:clj` and that _should_ start the server on 8080
 
-You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for now to run fig-wheel
+You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig:cljs` for now to run fig-wheel
 
 ## TODO
 
