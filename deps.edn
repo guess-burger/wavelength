@@ -1,23 +1,29 @@
 {:paths ["src" "src-cljs" "resources"]
- :deps  {org.clojure/clojure       {:mvn/version "1.11.1"}
-         org.clojure/clojurescript {:mvn/version "1.11.4"}
-         http-kit/http-kit         {:mvn/version "2.5.3"}
-         compojure/compojure       {:mvn/version "1.6.2"}
-         ring/ring-defaults        {:mvn/version "0.3.3"}
-         hiccup/hiccup             {:mvn/version "1.0.5"}   ;; included in reagent
-         reagent/reagent           {:mvn/version "1.1.0"}
-         cljsjs/react              {:mvn/version "17.0.2-0"}
-         cljsjs/react-dom          {:mvn/version "17.0.2-0"}
-         org.clojure/core.async    {:mvn/version "1.5.648"}
-         jarohen/chord             {:mvn/version "0.8.1"
-                                    :exclusions  [org.clojure/core.async]}}
+ :deps  {org.clojure/clojure            {:mvn/version "1.11.1"}
+         org.clojure/core.async         {:mvn/version "1.5.648"}
+         jarohen/chord                  {:mvn/version "0.8.1"
+                                         :exclusions  [org.clojure/core.async]} }
  :aliases
- {:run      {:main-opts ["-m" "wavelength.wavelength"]}
-
-  :build    {:deps       {io.github.seancorfield/build-clj
+ {:build    {:deps       {io.github.seancorfield/build-clj
                           {:git/tag "v0.6.7" :git/sha "22c2d09"}}
              :ns-default build}
+
+  :clj      {:extra-deps {org.clojure/tools.logging      {:mvn/version "1.2.4"}
+                          org.slf4j/slf4j-api            {:mvn/version "1.7.36"}
+                          ch.qos.logback/logback-classic {:mvn/version "1.2.11"}
+                          compojure/compojure            {:mvn/version "1.6.2"}
+                          http-kit/http-kit              {:mvn/version "2.5.3"}
+                          ring/ring-defaults             {:mvn/version "0.3.3"}
+                          hiccup/hiccup                  {:mvn/version "1.0.5"}   ;; included in reagent
+                    }}
+
+  :cljs     {:extra-deps {org.clojure/clojurescript      {:mvn/version "1.11.4"}
+                          reagent/reagent                {:mvn/version "1.1.0"}
+                          cljsjs/react                   {:mvn/version "17.0.2-0"}
+                          cljsjs/react-dom               {:mvn/version "17.0.2-0"}}}
   :dev      {:extra-paths ["dev"]}
+
+  :run      {:main-opts ["-m" "wavelength.wavelength"]}
   :repl/run {:main-opts ["-r" "-m" "wavelength.main"]}
   :repl/fig {:extra-deps {com.bhauman/figwheel-main       {:mvn/version "0.2.16"}
                           com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
