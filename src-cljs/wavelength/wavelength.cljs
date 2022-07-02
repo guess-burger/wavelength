@@ -216,7 +216,7 @@
   [{:keys [team-turn result wavelength] :as game-state} content]
   [:<>
    (when result
-     (let [{:keys [guess target active-score waiting-score catch-up? psychic clue]} result
+     (let [{:keys [guess target active-score waiting-score catch-up? psychic clue sudden-death]} result
            active-name (team-name team-turn)
            waiting-name (-> team-turn other-team team-name) ]
        [:<>
@@ -231,6 +231,9 @@
         (when catch-up?
           [:p {:style {:text-align "center"}}
            (str "Catch rule in play, " active-name " goes again")])
+        (when sudden-death
+          [:p {:style {:text-align "center"}}
+           "Sudden Death!"])
         [:hr]]))
    [:div {:style {:display               "grid"
                   :grid-template-columns "1fr"
@@ -291,7 +294,7 @@
 
 (defn pick-clue
   []
-  (let [{:keys [target wavelength]} (:game-state @state)
+  (let [{:keys [target wavelength] :as gs} (:game-state @state)
         clue (atom "")]
     (fn []
       [:<>
@@ -312,7 +315,8 @@
          [:input#clue {:type    "text"
                        :onInput (fn [x] (->> x .-target .-value (reset! clue)))}]
          [:input {:type  "submit"
-                  :value "Submit"}]]]])))
+                  :value "Submit"}]]]
+       [team-view gs]])))
 
 (defn team-guess-guesser
   [guess]
@@ -405,7 +409,7 @@
         "Play Again"]
        [:button {:on-click #(put! send-chan {:type :change-teams})}
         "Change Teams"]]]
-     [dump-state]]))
+     #_[dump-state]]))
 
 (defn app
   []

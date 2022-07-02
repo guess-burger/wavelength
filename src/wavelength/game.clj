@@ -195,7 +195,7 @@
                           (assoc context :score score :active-team team :waiting-team other
                                          :deck (wavelength-deck)))
                         ;;starting a new round
-                        (select-keys context [:score :deck
+                        (select-keys context [:score :sudden-death-rounds :deck
                                               :active-team :waiting-team
                                               :left :right :spectators
                                               :lobby :code]))
@@ -459,7 +459,7 @@
          (#{:left :right} (:guess msg))
          (contains? (get context (:waiting-team context)) from))
     (let [;context (assoc context :lr-guess (:guess msg))
-          {:keys [target guess active-team waiting-team score psychic]} context
+          {:keys [target guess active-team waiting-team score psychic sudden-death-rounds]} context
 
           lr-guess    (:guess msg)
           guess-score (condp >= (abs (- target guess))
@@ -478,33 +478,52 @@
           score       (update score waiting-team + lr-score)
           catch-up?   (and (= 4 guess-score)
                            (< (get score active-team) (get score waiting-team)))
-          ;; TODO probably need a tie breaker flag or something
+
+          winning-zone (some #(<= 10 %) (vals score))
+          [state sudden-death-rounds] (cond
+                                        (and sudden-death-rounds (< 0 sudden-death-rounds))
+                                        [::pick-psychic (dec sudden-death-rounds)]
+
+                                        (and winning-zone (apply = (vals score)))
+                                        ;; need to enter sudden death
+                                        [::pick-psychic 1]
+
+                                        winning-zone
+                                        ;; if we're in the "winning zone" but score aren't tied then someone has won
+                                        [::reveal sudden-death-rounds]
+
+                                        :default
+                                        [::pick-psychic nil])
 
           context     (cond-> (assoc context
                                      :score score)
+
                         (not catch-up?)
                         (assoc :active-team  waiting-team
-                               :waiting-team active-team))
-          state       (if (some #(<= 10 %) (vals score)) ::reveal ::pick-psychic)]
+                               :waiting-team active-team)
+
+                        sudden-death-rounds
+                        (assoc :sudden-death-rounds sudden-death-rounds))
+
+          result (cond-> {:active        active-team
+                          :active-score  guess-score
+                          :waiting-score lr-score
+                          :catch-up?     catch-up?
+                          :target        target
+                          :guess         guess
+                          :psychic       (get-in context [active-team psychic])
+                          :clue          (:clue context)}
+                   sudden-death-rounds
+                   (assoc :sudden-death true))]
       {::st/context context
        ::st/state   state
        ::st/fx      {::st/send [(msg-to-everyone context
                                                  {:type   :merge
-                                                  ;; FIXME does this need to send the new score?
-                                                  ;; NO! Pick psychic does it... of course
-                                                  :result {:active        active-team
-                                                           :active-score  guess-score
-                                                           :waiting-score lr-score
-                                                           :catch-up?     catch-up?
-                                                           :target        target
-                                                           :guess         guess
-                                                           :psychic       (get-in context [active-team psychic])
-                                                           :clue          (:clue context)}})]}})
+                                                  :result result})]}})
 
     :default
     {::st/context context
      ::st/state   ::st/recur}))
-
 
 
 ;; --- Reveal Phase

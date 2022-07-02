@@ -133,28 +133,66 @@
                     :catch-up? false
                     :clue "clue"
                     :psychic "left one"
-                    ;; FIXME mark that someone won!
-                    ;; TODO not sure we need that since we could make reveal send out how won when it changes the UI
                     :target 88 :guess 83}
                    ::sut/reveal)))))
 
-#_(deftest tie-breaker
+(deftest tie-breaker
   ;; If there's a tie, each team takes a final sudden death turn.
   ;; The team that scores the most points that round wins (including the LEFT/RIGHT guess).
   ;; If there's still a tie, repeat until a team has won.
 
-  ;; TODO need some way of marking tie breaker, and whether each team has had their turn...
-  ;; this needs to repeat until someone wins too!!!
   (testing "entering sudden death"
     (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :right} :right-one]
                                        (create-context 88 83 7 9 :left :right))
-           (output (create-context 88 83 10 10 :right :left :left)
-                   {:active :left
+           (output (assoc (create-context 88 83 10 10 :right :left :left)
+                          :sudden-death-rounds 1)
+                   {:active       :left
                     :active-score 3 :waiting-score 1
-                    :catch-up? false
-                    :clue "clue"
-                    :psychic "left one"
+                    :catch-up?    false
+                    :clue         "clue"
+                    :psychic      "left one"
                     :sudden-death true
-                    :target 88 :guess 83}))))
+                    :target       88 :guess 83}))))
 
-  (is (= :foo :bar)))
+  (testing "first round of sudden death"
+    (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :right} :left-one]
+                                       (assoc (create-context 88 83 10 10 :right :left)
+                                              :sudden-death-rounds 1))
+           (output (assoc (create-context 88 83 11 13 :left :right :right)
+                          :sudden-death-rounds 0)
+                   {:active       :right
+                    :active-score 3 :waiting-score 1
+                    :catch-up?    false
+                    :clue         "clue"
+                    :psychic      "right one"
+                    :sudden-death true
+                    :target       88 :guess 83}))))
+
+  (testing "second round of sudden death"
+    (testing "ending with a winner"
+      (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :right} :right-one]
+                                         (-> (create-context 88 89 11 13 :left :right)
+                                             (assoc :sudden-death-rounds 0)))
+             (output (-> (create-context 88 89 15 13 :right :left :left)
+                         (assoc :sudden-death-rounds 0))
+                     {:active       :left
+                      :active-score 4 :waiting-score 0
+                      :catch-up?    false
+                      :clue         "clue"
+                      :psychic      "left one"
+                      :sudden-death true
+                      :target       88 :guess 89}
+                     ::sut/reveal))))
+    (testing "ending with another draw"
+      (is (= (sut/left-right-transitions [{:type :pick-lr, :guess :right} :right-one]
+                                         (-> (create-context 88 83 11 13 :left :right)
+                                             (assoc :sudden-death-rounds 0)))
+             (output (-> (create-context 88 83 14 14 :right :left :left)
+                         (assoc :sudden-death-rounds 1))
+                     {:active       :left
+                      :active-score 3 :waiting-score 1
+                      :catch-up?    false
+                      :clue         "clue"
+                      :psychic      "left one"
+                      :sudden-death true
+                      :target       88 :guess 83}))))))
