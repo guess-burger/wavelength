@@ -39,7 +39,7 @@
   (mapcat keys [left right spectators]))
 
 ;; -- Lobby
-;; A holding areas where players join as spectators before picking the team they wish to play in.
+;; A holding area where players join as spectators before picking the team they wish to play in.
 ;; the match can only begin when there are at least 2 players in each team
 
 (defn ^:private ready?
@@ -170,7 +170,7 @@
 
 ;; --- Pick Psychic - Psychic Phase
 ;; During this phase any member of the active team can declare they will be the psychic this round.
-;; If there isn't an active team yet then on is randomly selected.
+;; If there isn't an active team yet then one is randomly selected.
 
 (def ^:private wavelengths-cards (edn/read-string (slurp (io/resource "prompts.edn"))))
 
@@ -180,13 +180,6 @@
 
 (defn on-entry-pick-psychic
   [context]
-
-  ;; Probably need to pick a team to go if there isn't one already
-  ;; Do we need first entry then? Since we will want to "reenter" this state in another round
-  ;; but we won't need to reset all the state...
-  ;; but then what if we play another game? Even if we went "through" a lobby
-  ;; we'd probably still want to be in the same "room"
-
   (let [round-context (if (nil? (:score context))
                         ;; starting a game from a lobby
                         (let [team (rand-nth [:left :right])
@@ -548,9 +541,20 @@
     (nil? msg)
     (remove-player context from)
 
-    ;; Change teams (i.e. go back to team-lobby)
+    ;; Change teams (i.e. go back to team-lobby/team select)
+    (= :change-teams (:type msg))
+    {::st/state   ::wait-in-lobby
+     ::st/context (dissoc context :score)
+     ::st/fx      {::st/send [(msg-to-everyone context
+                                               {:type :merge
+                                                :result nil
+                                                :score  nil
+                                                ;; TODO this one feels a little different now since that
+                                                ;; after doing the team lobby we started making the on-entry
+                                                ;; update the user state
+                                                :mode :team-lobby})]}}
 
-    ;; Play again (i.e. go back to pick psychic with no result and no score?)
+    ;; Play again (i.e. start another game with the same teams)
     (= :play-again (:type msg))
     {::st/state   ::pick-psychic
      ::st/context (dissoc context :score)

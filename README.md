@@ -23,7 +23,7 @@ You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for 
 * [X] Make it look a little better
 * [X] Figure out if someone has won
   * [X] play again
-  * [_] change teams
+  * [X] change teams
 * [X] Sudden death
 * [_] Quit/rejoin state bugs
 * [_] Heroku?
@@ -49,7 +49,7 @@ You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for 
   * Will a logging framework make the same mistake? How can you get around it? 
   * Logging frameworks don't handle this!!
 * Quitting then rejoining puts those that didn't quit back in old state
-* 
+* Long wavelength prompts render a bit strange (GH issue #2)
 
 ...
 
