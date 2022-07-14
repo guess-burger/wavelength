@@ -163,7 +163,7 @@
 
     (and (= :start (:type msg)) (ready? context))
     {::st/state   ::pick-psychic
-     ::st/context context}
+     ::st/context (select-keys context [:left :right :spectators :lobby :code])}
 
     :default
     (ignore+recur context)))
@@ -180,26 +180,26 @@
 
 (defn on-entry-pick-psychic
   [context]
-  (let [round-context (if (nil? (:score context))
-                        ;; starting a game from a lobby
-                        (let [team (rand-nth [:left :right])
-                              other (other-team team)
-                              score (update {:left 0 :right 0} other inc)]
-                          (assoc context :score score :active-team team :waiting-team other
-                                         :deck (wavelength-deck)))
-                        ;;starting a new round
-                        (select-keys context [:score :sudden-death-rounds :deck
-                                              :active-team :waiting-team
-                                              :left :right :spectators
-                                              :lobby :code]))
-        active-msg    {:type :merge
-                       :mode :pick-psychic
-                       :active true
-                       :team-turn (:active-team round-context)
-                       :score (:score round-context)
-                       ;;
-                       }
-        waiting-msg (assoc active-msg :active false)
+  (let [coming-from-lobby? (nil? (:score context))
+        round-context      (if coming-from-lobby?
+                             (let [team  (rand-nth [:left :right])
+                                   other (other-team team)
+                                   score (update {:left 0 :right 0} other inc)]
+                               (assoc context :score score :active-team team
+                                      :waiting-team other :deck (wavelength-deck)))
+                             ;;otherwise we're starting a new round
+                             (select-keys context [:score :sudden-death-rounds :deck
+                                                   :active-team :waiting-team
+                                                   :left :right :spectators
+                                                   :lobby :code]))
+        active-msg         (cond-> {:type      :merge
+                                    :mode      :pick-psychic
+                                    :active    true
+                                    :team-turn (:active-team round-context)
+                                    :score     (:score round-context)}
+                             ;; remove any previous round results if the players just switched teams in the lobby
+                             coming-from-lobby? (assoc :result nil))
+        waiting-msg        (assoc active-msg :active false)
         [to-active to-waiting] (active-waiting-chs round-context)]
 
     {::st/context round-context
@@ -547,7 +547,6 @@
      ::st/context (dissoc context :score)
      ::st/fx      {::st/send [(msg-to-everyone context
                                                {:type :merge
-                                                :result nil
                                                 :score  nil
                                                 ;; TODO this one feels a little different now since that
                                                 ;; after doing the team lobby we started making the on-entry

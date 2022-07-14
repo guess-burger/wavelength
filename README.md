@@ -25,11 +25,17 @@ You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for 
   * [X] play again
   * [X] change teams
 * [X] Sudden death
-* [_] Quit/rejoin state bugs
+* [X] Quit/rejoin state bugs (so far)
 * [_] Heroku?
-* [_] Clean up and document stately
+  * deploying
+  * keeping the ws alive for longer than 1min
+* [_] a proper style sheet
+  * [_] maybe even a container div
 * [_] Allow spectators to join mid-game
   * This one will need the full state for spectators collecting and sending out
+  * Do lobbys continue to live in the lobby atom?
+    * What happen when you try to join one right now?
+* [_] Clean up and document stately
 * [_] Make a custom slider
 
 
@@ -42,13 +48,12 @@ You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for 
 ### Bugs
 
 * No inputs to stately cause hot-loop if there is a default that recurs
-  * I mean what does it mean have no inputs... that seems an error
+  * I mean what does it mean have to have no inputs... that seems an error
   * Actually... is it that the real problem or it that it now null since they are closed
     * probably need to figure out leaving asap and make it reusable 
 * Deck is an infinite sequence that which is fine until println tries to walk the entire thing
   * Will a logging framework make the same mistake? How can you get around it? 
   * Logging frameworks don't handle this!!
-* Quitting then rejoining puts those that didn't quit back in old state
 * Long wavelength prompts render a bit strange (GH issue #2)
 
 ...
