@@ -71,23 +71,32 @@
        ::st/fx      {::st/send [{::st/msg out-msg
                                  ::st/to  members}]}})))
 
+(defn nickname
+  [wanted-nickname taken-nicknames]
+  (if (contains? taken-nicknames wanted-nickname)
+    (if-let [[_ base digit] (re-matches #"(.*) \((\d+)\)$" wanted-nickname)]
+      (recur (str base " (" (-> digit Integer/parseInt inc) ")") taken-nicknames)
+      (recur (str wanted-nickname " (1)") taken-nicknames))
+    wanted-nickname))
+
 (defn- join
   [msg {:keys [left spectators right code] :as context}]
-  (let [joiner       (:player msg)
-        spectators'  (assoc spectators joiner (:nickname msg))
-        joiner-msg {:type       :merge
+  (let [existing     (merge left spectators right)
+        nickname     (nickname (:nickname msg) (set (vals existing)))
+        joiner       (:player msg)
+        spectators'  (assoc spectators joiner nickname)
+        joiner-msg {:type       :reset
+                    :nickname   nickname
                     :mode       :team-lobby
                     :room-code  code
                     :left       (sequence (vals left))
                     :spectators (vals spectators')
                     :right      (sequence (vals right))}
-        existing     (concat (keys left) (keys spectators) (keys right))
         existing-msg {:type       :merge
                       :spectators (vals spectators')}]
     {::st/state   ::st/recur
-     ::st/context (assoc context
-                         :spectators spectators')
-     ::st/fx      {::st/send [{::st/to  existing
+     ::st/context (assoc context :spectators spectators')
+     ::st/fx      {::st/send [{::st/to  (keys existing)
                                ::st/msg existing-msg}
                               {::st/to  [joiner]
                                ::st/msg joiner-msg}]}}))

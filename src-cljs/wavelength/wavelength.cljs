@@ -53,19 +53,14 @@
   [url params]
   (guri/appendParamsFromMap  url (clj->js params)))
 
-;; TODO rename
-(defn start-echo [url nickname room]
+(defn connect-to-server [url nickname room]
   (go
     (let [{:keys [ws-channel error]} (<! (ws-ch (append-params url {:nickname nickname :room room})))]
       (if-not error
         (do
           (send-msg-loop ws-channel)
           (receive-msg-loop ws-channel nickname)
-          ;; FIXME this feels rather strange! <- WHY?
-          ;; FIXME maybe put this into a loading or something and get the server to confirm mode and nickname
-          ;; FIXME because what happens if a nickname is already taken?
-          ;; TODO I think the server should return the nickname (and mode) so if there are 2 users trying to use "a"
-          ;; as a username then the second returns as "a (2)"
+          ;; Keep this since the creator of the lobby doesn't currently get sent their nickname
           (swap! state assoc :game-state {:nickname nickname :mode :team-lobby}))
         (swap! state assoc :error error)))))
 
@@ -88,7 +83,7 @@
        [:input#room {:style {:margin-bottom "1em"}
                      :type "text"
                      :onInput (fn [x] (->> x .-target .-value (reset! room)))}]
-       [:button {:on-click #(start-echo url @nickname @room)}
+       [:button {:on-click #(connect-to-server url @nickname @room)}
         "Submit"]])))
 
 (defn dump-state []
