@@ -12,13 +12,15 @@
          jarohen/chord             {:mvn/version "0.8.1"
                                     :exclusions  [org.clojure/core.async]}}
  :aliases
- {:run      {:main-opts ["-m" "wavelength.wavelength"]}
+ {:run       {:main-opts ["-m" "wavelength.main"]}
 
-  :build    {:deps       {io.github.seancorfield/build-clj
-                          {:git/tag "v0.6.7" :git/sha "22c2d09"}}
-             :ns-default build}
-  :dev      {:extra-paths ["dev"]}
-  :repl/run {:main-opts ["-r" "-m" "wavelength.main"]}
-  :repl/fig {:extra-deps {com.bhauman/figwheel-main       {:mvn/version "0.2.16"}
-                          com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
-             :main-opts  ["-m" "figwheel.main" "-b" "dev" "-r"]}}}
+  ;:build     {:deps       {io.github.seancorfield/build-clj
+  ;                         {:git/tag "v0.6.7" :git/sha "22c2d09"}}
+  ;            :ns-default build}
+  :dev       {:extra-paths ["dev"]}
+  :repl/run  {:main-opts ["-r" "-m" "wavelength.main"]}
+  :repl/fig  {:extra-deps {com.bhauman/figwheel-main       {:mvn/version "0.2.16"}
+                           com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
+              :main-opts  ["-m" "figwheel.main" "-b" "dev" "-r"]}
+  :fig/build {:extra-deps {com.bhauman/figwheel-main {:mvn/version "0.2.16"}}
+              :main-opts  ["-m" "figwheel.main" "-O" "simple" "--build-once" "dev"]}}}

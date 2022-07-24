@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+
+# just need a way to build the JS first
+clojure -M:fig/build
