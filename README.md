@@ -26,7 +26,7 @@ You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for 
   * [X] change teams
 * [X] Sudden death
 * [X] Quit/rejoin state bugs (so far)
-* [_] Heroku?
+* [X] Heroku?
   * deploying
   * keeping the ws alive for longer than 1min
 * [_] a proper style sheet

@@ -47,7 +47,12 @@
   "What a lovely hack to just get around chord adding :message to everything"
   [ws-ch]
   ;; FIXME is this really the best way to do this?
-  (let [in-ch (as/pipe ws-ch (as/chan 1 (map :message)))]
+  (let [xform (comp
+               ;; remove chord wrapping :message
+               (map :message)
+               ;; filter out keep-alives from clients
+               (filter #(not= :keep-alive %)))
+        in-ch (as/pipe ws-ch (as/chan 1 xform))]
     (bidi-ch in-ch ws-ch)))
 
 ;; FIXME this is a bad name

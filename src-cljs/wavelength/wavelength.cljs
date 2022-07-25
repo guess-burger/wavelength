@@ -1,12 +1,12 @@
 (ns wavelength.wavelength
   (:require
    [chord.client :refer [ws-ch]]
-   [cljs.core.async :as async :refer [chan <! >! put! close! go go-loop]]
+   [cljs.core.async :as async :refer [chan <! >! put! close!]]
    [clojure.string :as str]
    [goog.uri.utils :as guri]
    [reagent.core :as r]
-   [reagent.dom :as dom]
-   ))
+   [reagent.dom :as dom])
+  (:require-macros [cljs.core.async :refer [alt! go-loop go]]))
 
 (defonce send-chan (chan))
 
@@ -18,23 +18,22 @@
 (defn send-msg-loop
   [svr-chan]
   (go-loop []
-     (when-let [msg (<! send-chan)]
-       ;; FIXME I think the whole go-loop from send-chan to
-       ;; serv-chan is a bit strange to be honest
-       ;; I _think_ the point is to hide the bi-directional channel
-       ;; since we don't really want anything other than the receive-loop
-       ;; actually taking the messages.. (so why does chord big up the fact it is bi-di then?)
-       (println "send-msg-loop sending" msg)
-       (when (>! svr-chan msg)
-         (recur)))))
+    ;; Heroku ws connections timeout when no message is sent/received in 55s
+    (let [timeout-ch (async/timeout 45000)
+          msg        (alt!
+                      timeout-ch :keep-alive
+                      send-chan ([msg] msg))]
+      (when msg
+        (println "send-msg-loop sending" msg)
+        (when (>! svr-chan msg)
+          (recur))))))
 
 (defn receive-msg-loop
   [svr-chan nickname]
-  (println nickname)
   (go-loop []
      (if-let [new-msg (:message (<! svr-chan))]
        (do
-         (println "got: " new-msg)
+         (println nickname " got: " new-msg)
          (case  (:type new-msg)
            :reset
            (swap! state assoc :game-state (dissoc new-msg :type))
