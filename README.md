@@ -29,8 +29,8 @@ You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for 
 * [X] Heroku?
   * deploying
   * keeping the ws alive for longer than 1min
-* [_] a proper style sheet
-  * [_] maybe even a container div
+* [X] a proper style sheet
+  * [X] maybe even a container div
 * [_] Allow spectators to join mid-game
   * This one will need the full state for spectators collecting and sending out
   * Do lobbys continue to live in the lobby atom?

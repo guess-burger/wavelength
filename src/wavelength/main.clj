@@ -16,7 +16,8 @@
 (defn index-page []
   (hc/html
     [:head
-     [:title "Wavelength"]]
+     [:title "Wavelength"]
+     [:link {:rel "stylesheet" :href (hcu/to-uri "/main.css")}]]
     [:body
      [:div#container]
      [:script {:type "text/javascript", :src (hcu/to-uri "/js/main.js")}]]))

@@ -70,10 +70,8 @@
                      (str/replace #"^http" "ws")
                      (str "/lobby"))]
     (fn []
-      [:div {:style {:display "grid"
-                     :grid-template-columns "1fr"
-                     :justify-items "center"}}
-       [:h1 #_{:style {:text-align "center"}} "Wavelength"]
+      [:div.center-grid.cols-1
+       [:h1 "Wavelength"]
        [:label {:for "nickname"} "Nickname"]
        [:input#nickname {:style {:margin-bottom "1em"}
                          :type    "text"
@@ -108,18 +106,15 @@
     [:<>
      [:h1 {:style {:text-align "center"}}
       "Wavelength"]
-     (when msg
-       [:p msg])
      [:ul
       [:li (str "Room: " room-code)]
       [:li (str "nickname: " nickname)]]
-     [:div {:style {:display "grid"
-                    :grid-template-columns "repeat(3, 1fr)"
-                    :justify-items "center"}}
+     (when msg [:p.fw.txt-c msg])
+     [:div.center-grid.cols-3
       [team-div "Left Brain" :left left 1]
       [team-div "Spectators" :spectators spectators 2]
       [team-div "Right Brain" :right right 3]
-      [:div {:style    {:grid-column 2 :grid-row 4}}
+      [:div.gr4.gc2
        ;; using a div to stop the button expanding to fill grid
        ;; Probably a better way of doing that
        [:button {:disabled (not ready)
@@ -136,16 +131,13 @@
   [{:keys [score left right spectators]}]
   [:<>
    [:hr]
-   [:div {:style {:display               "grid"
-                  :grid-template-columns "repeat(3, 1fr)"
-                  :justify-items         "center"}}
-    [:p (str "Left Brain: " (:left score) "/10")]
+   [:div.center-grid.cols-3 [:p (str "Left Brain: " (:left score) "/10")]
     [:p (str (if (number? spectators) spectators (count spectators)) " Spectators")]
     [:p (str "Right Brain: " (:right score) "/10")]
     [:div
      (for [player left]
        [:p player])]
-    [:div {:style {:grid-column 3}}
+    [:div.gc3
      (for [player right]
        [:p player])]]])
 
@@ -155,19 +147,10 @@
    their sliders so the only way to really get around that will be to make a custom slider component.
    Or use on that works how I need it "
   [wavelength clue guess target on-change]
-  [:div {:style {:display               "grid"
-                 :grid-template-columns "repeat(3, 1fr)"
-                 :justify-items         "center"}}
-   [:p {:style {:grid-row 1 :grid-column 1}}
-    (first wavelength)]
-   [:p {:style {:grid-row 1 :grid-column 3}}
-    (second wavelength)]
-   [:div {:style {:grid-row              2
-                  :width                 "100%"
-                  :grid-column           "1 / 4"
-                  :display               "grid"
-                  :grid-template-columns "repeat(220, 1fr)"
-                  :justify-items         "center"}}
+  [:div.center-grid.cols-3
+   [:p.gr1.gc1 (first wavelength)]
+   [:p.gr1.gc3 (second wavelength)]
+   [:div.center-grid.cols-222.gr2.gc1-4.fw
     [:input {:style     {:width       "100%"
                          :grid-column " 2 / 220"
                          :grid-row    2
@@ -194,13 +177,12 @@
                         :grid-row         "1 / 3"
                         :grid-column      (str (max 1 (- centre 25)) " / " (min 221 (+ centre 25)))
                         :width            "100%"
-                        :z-index          2}}]]))]])
+                        :z-index          2
+                        :border-radius "5px"}}]]))]])
 
 (defn psychics-clue
   [name clue]
-  [:p {:style {:text-align "center"}}
-   (str name "'s clue: ")
-   [:strong clue]])
+  [:p.txt-c (str name "'s clue: ") [:strong clue]])
 
 (def other-team
   {:left  :right
@@ -217,22 +199,18 @@
         [psychics-clue psychic clue]
         [thinger wavelength nil guess target nil]
         #_[:h3 "Result"]
-        [:p {:style {:text-align "center"}}
+        [:p.txt-c
          (str active-name " scored " active-score " points")]
         (when (= 1 waiting-score)
-          [:p {:style {:text-align "center"}}
+          [:p.txt-c
            (str waiting-name " scored 1 point for their counter guess")])
         (when catch-up?
-          [:p {:style {:text-align "center"}}
+          [:p.txt-c
            (str "Catch rule in play, " active-name " goes again")])
         (when sudden-death
-          [:p {:style {:text-align "center"}}
-           "Sudden Death!"])
+          [:p.txt-c "Sudden Death!"])
         [:hr]]))
-   [:div {:style {:display               "grid"
-                  :grid-template-columns "1fr"
-                  :justify-items         "center"}}
-    content]
+   [:div.center-grid.cols-1 content]
    [team-view game-state]])
 
 (defn pick-psychic []
@@ -241,9 +219,7 @@
      #_[:h2 "Pick Psychic"]
      [waiting-screen
       gs
-      [:div {:style {:display               "grid"
-                     :grid-template-columns "1fr"
-                     :justify-items         "center"}}
+      [:div.center-grid.cols-1
        (if active
          [:<>
           [:p "Choose a Psychic for the round"]
@@ -260,22 +236,17 @@
      #_[:h2 "Pick Wavelength"]
      (if (= :psychic role)
        [:<>
-        [:div {:style {:display               "grid"
-                       :grid-template-columns "repeat(2, 1fr)"
-                       :justify-items         "center"}}
-         [:p {:style {:grid-column "1 / 3"}}
-          "Pick a Wavelength for your team to guess on"]
+        [:div.center-grid.cols-2
+         [:p.gc1-3 "Pick a Wavelength for your team to guess on"]
          [:p (str (first opt1) " <--> " (second opt1))]
-         [:button {:style    {:grid-row 3}
-                   :on-click #(put! send-chan {:type :pick-card
-                                               :pick opt1})}
+         [:button.gr3 {:on-click #(put! send-chan {:type :pick-card
+                                                   :pick opt1})}
           "Pick"]
          [:p (str (first opt2) " <--> " (second opt2))]
          [:button {:on-click #(put! send-chan {:type :pick-card
                                                :pick opt2})}
           "Pick"]
-         [:button {:style    {:grid-column "1 / 3"}
-                   :on-click #(put! send-chan {:type :switch-cards})}
+         [:button.gc1-3 {:on-click #(put! send-chan {:type :switch-cards})}
           "Switch Cards"]]
         [team-view gs]]
        [waiting-screen gs
@@ -294,13 +265,9 @@
       [:<>
        #_[:h2 "Pick clue"]
        [thinger wavelength "" target target nil]
-       [:p {:style {:text-align "center"}}
-        "Enter a clue that represents where on the wavelength the target sits"]
-       [:p {:style {:text-align "center"}}
-        "Remember you not are not allowed to communicate with your team after this point!"]
-       [:div {:style {:display               "grid"
-                      :grid-template-columns "1fr"
-                      :justify-items "center"}}
+       [:p.txt-c "Enter a clue that represents where on the wavelength the target sits"]
+       [:p.txt-c "Remember you not are not allowed to communicate with your team after this point!"]
+       [:div.center-grid.cols-1
         [:form {:on-submit (fn [x]
                              (.preventDefault x)
                              (put! send-chan {:type :pick-clue
@@ -322,15 +289,10 @@
        [thinger wavelength nil guess nil (fn [x]
                                            (let [x (js/parseInt (.. x -target -value))]
                                              (put! send-chan {:type :move-guess :guess x})))]
-       [:div {:style {:display               "grid"
-                      :grid-template-columns "repeat(3, 1fr)"
-                      :justify-items         "center"}}
-        [:p {:style {:grid-row    3
-                     :grid-column "1 /4"}}
+       [:div.center-grid.cols-3
+        [:p.gr-3.gc1-4
          "Discuss the clue with your team and as a team decide where on the wavelength the clue sits"]
-        [:button {:style    {:grid-row    4
-                             :grid-column "1 /4"}
-                  :on-click #(put! send-chan {:type :pick-guess, :guess guess})}
+        [:button.gr-4.gc1-4 {:on-click #(put! send-chan {:type :pick-guess, :guess guess})}
          "Submit"]]])))
 
 (defn team-guess-listener
@@ -338,7 +300,7 @@
   (let [{:keys [guess wavelength]} (:game-state @state)]
     [:<>
      [thinger wavelength nil guess nil]
-     [:p {:style {:text-align "center"}} msg]]))
+     [:p.txt-c msg]]))
 
 (defn team-guess
   []
@@ -367,25 +329,19 @@
     [:div
      #_[:h2 "Left-Right Phase"]
      [psychics-clue psychic clue]
-     [:div {:style {:display               "grid"
-                    :grid-template-columns "repeat(3, 1fr)"
-                    :justify-items         "center"}}
-      [:p {:style {:grid-row 1 :grid-column 1}}
-       (first wavelength)]
-      [:p {:style {:grid-row 1 :grid-column 3}}
-       (second wavelength)]
-      [:input {:style {:grid-row 2 :grid-column "1 / 4" :width "100%"}
-               :type "range" :value guess :max 110}]
+     [:div.center-grid.cols-3
+      [:p.gr1.gc1 (first wavelength)]
+      [:p.gr1.gc3 (second wavelength)]
+      [:input.gr2.gc1-4.fw {:type "range" :value guess :max 110}]
       (when (= :waiting role)
         [:<>
-         [:button {:style {:grid-row 3 :grid-column 1}
-                   :on-click #(put! send-chan {:type :pick-lr, :guess :left})}
+         [:button.gr3.gc1
+          {:on-click #(put! send-chan {:type :pick-lr, :guess :left})}
           "Left"]
-         [:button {:style {:grid-row 3 :grid-column 3}
-                   :on-click #(put! send-chan {:type :pick-lr, :guess :right})}
+         [:button.gr3.gc3
+          {:on-click #(put! send-chan {:type :pick-lr, :guess :right})}
           "Right"]])
-      [:p {:style {:grid-row 4 :grid-column "1 / 4"}}
-       explanation]
+      [:p.gr4.gc1-4 explanation]
       #_[dump-state]]]))
 
 (defn reveal
@@ -393,12 +349,8 @@
   (let [{:keys [winner] :as gs} (:game-state @state)]
     [:<>
      [waiting-screen gs
-      [:div {:style {:display               "grid"
-                     :grid-template-columns "repeat(2, 1fr)"
-                     :justify-items         "center"}}
-       [:p {:style {:grid-column "1 / 3"}}
-        (str (team-name winner) " wins!")]
-       ;; FIXME why aren't these centering?
+      [:div.center-grid.cols-2.fw
+       [:p.gc1-3 (str (team-name winner) " wins!")]
        [:button {:on-click #(put! send-chan {:type :play-again})}
         "Play Again"]
        [:button {:on-click #(put! send-chan {:type :change-teams})}
@@ -407,22 +359,22 @@
 
 (defn app
   []
-  ;; FIXME probably want to look into some form of container for this
-  ;; as the grid expands across the whole screen which might not be the best
-  ;; thing to do
-  (let [s (:game-state @state)]
-    (case (:mode s)
-      nil              [create-room]
-      :team-lobby      [team-lobby]
-      :pick-psychic    [pick-psychic]
-      :pick-wavelength [pick-wavelength]
-      :pick-clue       [pick-clue]
-      :team-guess      [team-guess]
-      :left-right      [left-right]
-      :reveal          [reveal]
-      [:div
-       [:h2 "Eh?"]
-       [dump-state]])))
+  ;[:div {:style {:max-width 1280 :center true :margin "auto"}}
+   (let [s (:game-state @state)]
+     (case (:mode s)
+       nil [create-room]
+       :team-lobby [team-lobby]
+       :pick-psychic [pick-psychic]
+       :pick-wavelength [pick-wavelength]
+       :pick-clue [pick-clue]
+       :team-guess [team-guess]
+       :left-right [left-right]
+       :reveal [reveal]
+       [:div
+        [:h2 "Eh?"]
+        [dump-state]]))
+   ;]
+  )
 
 (dom/render [app]
           (. js/document (getElementById "container")))
