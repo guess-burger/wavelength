@@ -29,21 +29,17 @@ You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for 
 * [X] Heroku?
   * deploying
   * keeping the ws alive for longer than 1min
-* [X] a proper style sheet
+* [X] a separate style sheet
   * [X] maybe even a container div
-* [_] Allow spectators to join mid-game
-  * This one will need the full state for spectators collecting and sending out
-  * Do lobbys continue to live in the lobby atom?
-    * What happen when you try to join one right now?
+* [X] Allow spectators to join mid-game
 * [_] Clean up and document stately
+* [_] Something more stylish 
 * [_] Make a custom slider
+  * [_] Or maybe just make the on we have less "wonky"
 
 
 ### Things to keep an eye on
 
-* spectators should be able to join at any point really...
-  * So does that mean we need to break joining and the lobbies atom out of the lobbie ns?
-  * TODO: Let's ignore this for now and handle it later once things re working
 
 ### Bugs
 
@@ -55,6 +51,7 @@ You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for 
   * Will a logging framework make the same mistake? How can you get around it? 
   * Logging frameworks don't handle this!!
 * Long wavelength prompts render a bit strange (GH issue #2)
+* Slider is totally wonky and off the further up the bar you go
 
 ...
 

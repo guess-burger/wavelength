@@ -34,9 +34,9 @@
   {::st/to  (mapcat keys [left right spectators])
    ::st/msg msg})
 
-(defn everyone-inputs
-  [{:keys [left right spectators] :as _context}]
-  (mapcat keys [left right spectators]))
+(defn all-inputs
+  [{:keys [lobby left spectators right]}]
+  (concat (keys left) (keys spectators) (keys right) [lobby]))
 
 ;; -- Lobby
 ;; A holding area where players join as spectators before picking the team they wish to play in.
@@ -76,26 +76,28 @@
   (if (contains? taken-nicknames wanted-nickname)
     (if-let [[_ base digit] (re-matches #"(.*) \((\d+)\)$" wanted-nickname)]
       (recur (str base " (" (-> digit Integer/parseInt inc) ")") taken-nicknames)
-      (recur (str wanted-nickname " (1)") taken-nicknames))
+      (recur (str wanted-nickname " (2)") taken-nicknames))
     wanted-nickname))
 
-(defn- join
-  [msg {:keys [left spectators right code] :as context}]
+(defn- join-from-lobby
+  [out-msg-fn msg {:keys [left spectators right code] :as context}]
   (let [existing     (merge left spectators right)
         nickname     (nickname (:nickname msg) (set (vals existing)))
         joiner       (:player msg)
         spectators'  (assoc spectators joiner nickname)
-        joiner-msg {:type       :reset
-                    :nickname   nickname
-                    :mode       :team-lobby
-                    :room-code  code
-                    :left       (sequence (vals left))
-                    :spectators (vals spectators')
-                    :right      (sequence (vals right))}
         existing-msg {:type       :merge
-                      :spectators (vals spectators')}]
+                      :spectators (vals spectators')}
+        context'     (assoc context :spectators spectators')
+        joiner-msg   (merge {;; These seem like standard things
+                             :type       :reset
+                             :nickname   nickname
+                             :room-code  code
+                             :left       (sequence (vals left))
+                             :spectators (vals spectators')
+                             :right      (sequence (vals right))}
+                            (out-msg-fn context'))]
     {::st/state   ::st/recur
-     ::st/context (assoc context :spectators spectators')
+     ::st/context context'
      ::st/fx      {::st/send [{::st/to  (keys existing)
                                ::st/msg existing-msg}
                               {::st/to  [joiner]
@@ -136,9 +138,9 @@
         (ignore+recur context)))
     (ignore+recur context)))
 
-(defn wait-in-lobby-inputs
-  [{:keys [lobby left spectators right]}]
-  (concat (keys left) (keys spectators) (keys right) [lobby]))
+(defn- join-lobby-msg
+  [_context]
+  {:mode :team-lobby})
 
 (defn wait-in-lobby-entry-fx
   [{:keys [left right spectators code lobby-msg] :as context}]
@@ -154,7 +156,6 @@
 
 (defn wait-in-lobby-transitions
   [[msg from] {:keys [lobby] :as context}]
-
   (cond
 
     ;; FIXME another leak about core async?
@@ -162,7 +163,7 @@
     (leave-lobby from context)
 
     (and (= from lobby) (= :join (:type msg)))
-    (join msg context)
+    (join-from-lobby join-lobby-msg msg context)
 
     (= :pick-team (:type msg))
     (pick-team context msg from)
@@ -245,28 +246,12 @@
   [{:keys [psychic spectators] :as context}]
   (let [[active waiting] (active-waiting-chs context)
         active (remove #{psychic} active)]
-    [psychic active waiting spectators]))
+    [psychic active waiting (keys spectators)]))
 
 (defn pick-psychic
   [from {:keys [active-team waiting-team deck] :as context}]
   (println (assoc context :deck "<infinite!>"))
   ;; FIXME might need some print-fn for the context to prevent stately printing infinite seqs
-
-  ;; Something like this...
-  #_{:left         {:foo-ch "foo"}
-     :right        {:bar-ch "bar"}
-
-     :score        {:left  1
-                    :right 0}
-
-     :active-team  :right
-     :waiting-team :left
-
-     :psychic      :foo-ch
-     ;; having this here means we can use the team just for nicknames and stuff
-     ;; but use the rest-team and psychic for checking listening
-     :rest-team    #{:bar-ch :foo-ch}
-     }
 
   (let [team (active-team context)]
     (if (contains? (active-team context) from)
@@ -281,13 +266,7 @@
         {::st/context context
          ;; TODO need to send msg? Or make the next state do that?
          ::st/state   ::pick-wavelength
-         ::st/fx      {::st/send [#_{::st/to  [from]
-                                   ::st/msg (assoc base-msg
-                                              :wavelengths (take 2 deck))}
-                                  #_{::st/to  (concat rest-team spectators (-> context waiting-team keys))
-                                   ::st/msg (assoc base-msg
-                                              :psychic (get-in context [active-team from]))}
-                                  {::st/to  [psychic]
+         ::st/fx      {::st/send [{::st/to  [psychic]
                                    ::st/msg (assoc base-msg
                                                    :wavelengths (take 2 deck)
                                                    :role :psychic
@@ -302,13 +281,22 @@
        ::st/state   ::st/recur})))
 
 
-(defn pick-psychic-transitions
-  [[msg from] {:keys [] :as context}]
+(defn pick-psychic-spectator-join
+  [{:keys [active-team score] :as _context}]
+  {:mode      :pick-psychic
+   :active    false
+   :team-turn active-team
+   :score     score})
 
+(defn pick-psychic-transitions
+  [[msg from] {:keys [lobby] :as context}]
   (cond
 
     (nil? msg)
     (remove-player context from)
+
+    (and (= from lobby) (= :join (:type msg)))
+    (join-from-lobby pick-psychic-spectator-join msg context)
 
     ;; TODO: should pick just be in place here since this is only the pick-psychic transitions?
     (= :pick-psychic (:type msg))
@@ -321,6 +309,15 @@
 ;; -- Pick Card - Psychic Phase
 ;; Here the Psychic is presented with two cards they can choose between. To make things a little easier
 ;; we also allow them to swap their cards for another 2 from the deck
+
+(defn pick-wavelength-spectator-join
+  [{:keys [active-team score psychic] :as context}]
+  {:mode      :pick-wavelength
+   :active    false
+   :team-turn active-team
+   :score     score
+   :psychic   (get-in context [active-team psychic])
+   :role      :spectator})
 
 (defn ^:private switch-cards
   [{:keys [psychic deck] :as context}]
@@ -352,11 +349,14 @@
                                            :wavelengths options}}]}})))
 
 (defn pick-wavelength-transitions
-  [[msg from] {:keys [psychic] :as context}]
+  [[msg from] {:keys [psychic lobby] :as context}]
   (cond
 
     (nil? msg)
     (remove-player context from)
+
+    (and (= from lobby) (= :join (:type msg)))
+    (join-from-lobby pick-wavelength-spectator-join msg context)
 
     (and (= :switch-cards (:type msg))
          (= psychic from))
@@ -389,11 +389,14 @@
                               ]}}))
 
 (defn pick-clue-transitions
-  [[msg from] {:keys [psychic] :as context}]
+  [[msg from] {:keys [psychic lobby] :as context}]
   (cond
 
     (nil? msg)
     (remove-player context from)
+
+    (and (= from lobby) (= :join (:type msg)))
+    (join-from-lobby pick-wavelength-spectator-join msg context)
 
     (and (= :pick-clue (:type msg))
          (= psychic from))
@@ -420,12 +423,26 @@
     {::st/context (assoc context :guess (/ board-range 2))
      ::st/fx      {::st/send [(msg-to-everyone context base-msg)]}}))
 
+(defn team-guess-spectator-join
+  [{:keys [active-team score psychic] :as context}]
+  {:mode      :team-guess
+   :clue       (:clue context)
+   :wavelength (:wavelength context)
+   :guess      (:guess context)
+   :psychic   (get-in context [active-team psychic])
+   :active    false
+   :team-turn active-team
+   :score     score})
+
 (defn team-guess-transitions
-  [[msg from] context]
+  [[msg from] {:keys [lobby] :as context}]
   (cond
 
     (nil? msg)
     (remove-player context from)
+
+    (and (= from lobby) (= :join (:type msg)))
+    (join-from-lobby team-guess-spectator-join msg context)
 
     (= :move-guess (:type msg))
     {::st/context (assoc context :guess (:guess msg))
@@ -450,12 +467,21 @@
   {::st/context context
    ::st/fx      {::st/send [(msg-to-everyone context {:type :merge, :mode :left-right})]}})
 
+(defn left-right-spectator-join
+  [context]
+  (-> (team-guess-spectator-join context)
+      ;; FIXME is there a load of stuff for sudden death that is needed?
+      (assoc :mode :left-right)))
+
 (defn left-right-transitions
-  [[msg from] context]
+  [[msg from] {:keys [lobby] :as context}]
   (cond
 
     (nil? msg)
     (remove-player context from)
+
+    (and (= from lobby) (= :join (:type msg)))
+    (join-from-lobby left-right-spectator-join msg context)
 
     (and (= :pick-lr (:type msg))
          (#{:left :right} (:guess msg))
@@ -542,16 +568,25 @@
                                                         :score score
                                                         :winner (first winner)})]}}))
 
+(defn- reveal-spectator-join
+  [{:keys [score] :as context}]
+  {:mode :reveal
+   :score score
+   :winner (first (max-key second (first score) (second score)))})
+
 (defn reveal-transitions
-  [[msg from] context]
-  (println msg (dissoc context :deck))
+  [[msg from] {:keys [lobby spectators] :as context}]
   (cond
 
     (nil? msg)
     (remove-player context from)
 
+    (and (= from lobby) (= :join (:type msg)))
+    (join-from-lobby reveal-spectator-join msg context)
+
     ;; Change teams (i.e. go back to team-lobby/team select)
-    (= :change-teams (:type msg))
+    (and (= :change-teams (:type msg))
+         (not (contains? spectators from)))
     {::st/state   ::wait-in-lobby
      ::st/context (dissoc context :score)
      ::st/fx      {::st/send [(msg-to-everyone context
@@ -563,7 +598,8 @@
                                                 :mode :team-lobby})]}}
 
     ;; Play again (i.e. start another game with the same teams)
-    (= :play-again (:type msg))
+    (and (= :play-again (:type msg))
+         (not (contains? spectators from)))
     {::st/state   ::pick-psychic
      ::st/context (dissoc context :score)
      ::st/fx      {::st/send [(msg-to-everyone context
@@ -578,25 +614,25 @@
 ;; ---
 
 (def state-machine
-  {::wait-in-lobby   {::st/inputs         #'wait-in-lobby-inputs
-                      ::st/on-entry       #'wait-in-lobby-entry-fx
+  {::wait-in-lobby   {::st/on-entry       #'wait-in-lobby-entry-fx
+                      ::st/inputs         #'all-inputs
                       ::st/transition-fn  #'wait-in-lobby-transitions}
    ::pick-psychic    {::st/on-entry       #'on-entry-pick-psychic
-                      ::st/inputs         #'everyone-inputs
+                      ::st/inputs         #'all-inputs
                       ::st/transition-fn  #'pick-psychic-transitions}
-   ::pick-wavelength {::st/inputs         #'everyone-inputs
+   ::pick-wavelength {::st/inputs         #'all-inputs
                       ::st/transition-fn  #'pick-wavelength-transitions}
    ::pick-clue       {::st/on-entry       #'pick-clue-on-entry
-                      ::st/inputs         #'everyone-inputs
+                      ::st/inputs         #'all-inputs
                       ::st/transition-fn  #'pick-clue-transitions}
    ::team-guess      {::st/on-entry       #'team-guess-on-entry
-                      ::st/inputs         #'everyone-inputs
+                      ::st/inputs         #'all-inputs
                       ::st/transition-fn  #'team-guess-transitions}
    ::left-right      {::st/on-entry       #'left-right-on-entry
-                      ::st/inputs         #'everyone-inputs
+                      ::st/inputs         #'all-inputs
                       ::st/transition-fn  #'left-right-transitions}
    ::reveal          {::st/on-entry       #'reveal-on-entry
-                      ::st/inputs         #'everyone-inputs
+                      ::st/inputs         #'all-inputs
                       ::st/transition-fn  #'reveal-transitions}})
 
 (defonce lobbies (atom {}))

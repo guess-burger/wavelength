@@ -112,7 +112,7 @@
      (when msg [:p.fw.txt-c msg])
      [:div.center-grid.cols-3
       [team-div "Left Brain" :left left 1]
-      [team-div "Spectators" :spectators spectators 2]
+      [team-div (str "Spectator" (when-not (= 1 (count spectators)) "s")) :spectators spectators 2]
       [team-div "Right Brain" :right right 3]
       [:div.gr4.gc2
        ;; using a div to stop the button expanding to fill grid
@@ -319,7 +319,7 @@
 
 (defn left-right
   []
-  (let [{:keys [wavelength role guess psychic clue team-turn]} (:game-state @state)
+  (let [{:keys [wavelength role guess psychic clue team-turn] :as gs} (:game-state @state)
         explanation (if (= :waiting role)
                       "Decide as a team if the target is Left or Right of the other teams guess to score points"
                       (let [active-name (team-name team-turn)
@@ -341,19 +341,22 @@
          [:button.gr3.gc3
           {:on-click #(put! send-chan {:type :pick-lr, :guess :right})}
           "Right"]])
-      [:p.gr4.gc1-4 explanation]
-      #_[dump-state]]]))
+      [:p.gr4.gc1-4 explanation]]
+     [team-view gs]
+     #_[dump-state]]))
 
 (defn reveal
   []
-  (let [{:keys [winner] :as gs} (:game-state @state)]
+  (let [{:keys [winner role] :as gs} (:game-state @state)]
     [:<>
      [waiting-screen gs
       [:div.center-grid.cols-2.fw
        [:p.gc1-3 (str (team-name winner) " wins!")]
-       [:button {:on-click #(put! send-chan {:type :play-again})}
+       [:button {:disabled (= :spectator role)
+                 :on-click #(put! send-chan {:type :play-again})}
         "Play Again"]
-       [:button {:on-click #(put! send-chan {:type :change-teams})}
+       [:button {:disabled (= :spectator role)
+                 :on-click #(put! send-chan {:type :change-teams})}
         "Change Teams"]]]
      #_[dump-state]]))
 
