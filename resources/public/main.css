@@ -28,3 +28,44 @@
     max-width: 1280;
     margin: auto;
 }
+
+.slider {
+/* So it seems that this is styling the whole slider which is why the height looks so weird
+   I think instead I want the track is what i want to style and leave this transparent or something
+    */
+    appearance: none;
+    height: 10px;
+    background: #d3d3d3;
+    opacity: 0.8;
+    margin-top: 5px;
+    margin-bottom: 5px;
+
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+
+  width: 10px;
+  height: 25px;
+  border-radius: 5px;
+
+  background: grey;
+
+  cursor: ew-resize;
+}
+
+.slider::-moz-range-thumb {
+  appearance: none;
+
+    width: 10px;
+    height: 25px;
+
+    background: grey;
+
+    cursor: ew-resize;
+}
+
+.slider:hover {
+  opacity: 1; /* Fully shown on mouse-over */
+}

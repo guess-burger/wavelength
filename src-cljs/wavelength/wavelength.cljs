@@ -70,18 +70,20 @@
                      (str/replace #"^http" "ws")
                      (str "/lobby"))]
     (fn []
-      [:div.center-grid.cols-1
-       [:h1 "Wavelength"]
-       [:label {:for "nickname"} "Nickname"]
-       [:input#nickname {:style {:margin-bottom "1em"}
-                         :type    "text"
-                         :onInput (fn [x] (->> x .-target .-value (reset! nickname)))}]
-       [:label {:for "room"} "Room Code"]
-       [:input#room {:style {:margin-bottom "1em"}
-                     :type "text"
-                     :onInput (fn [x] (->> x .-target .-value (reset! room)))}]
-       [:button {:on-click #(connect-to-server url @nickname @room)}
-        "Submit"]])))
+      [:<>
+             [:div.center-grid.cols-1
+        [:h1 "Wavelength"]
+
+        [:label {:for "nickname"} "Nickname"]
+        [:input#nickname {:style   {:margin-bottom "1em"}
+                          :type    "text"
+                          :onInput (fn [x] (->> x .-target .-value (reset! nickname)))}]
+        [:label {:for "room"} "Room Code"]
+        [:input#room {:style   {:margin-bottom "1em"}
+                      :type    "text"
+                      :onInput (fn [x] (->> x .-target .-value (reset! room)))}]
+        [:button {:on-click #(connect-to-server url @nickname @room)}
+         "Submit"]]])))
 
 (defn dump-state []
   [:<>
@@ -141,44 +143,63 @@
      (for [player right]
        [:p player])]]])
 
-;; FIXME need a better name
-(defn thinger
-  "This is 'good enough' for now. It isn't perfect but that due to the way that browsers choose to render
-   their sliders so the only way to really get around that will be to make a custom slider component.
-   Or use on that works how I need it "
+(defn target-slider
   [wavelength clue guess target on-change]
-  [:div.center-grid.cols-3
-   [:p.gr1.gc1 (first wavelength)]
-   [:p.gr1.gc3 (second wavelength)]
-   [:div.center-grid.cols-222.gr2.gc1-4.fw
-    [:input {:style     {:width       "100%"
-                         :grid-column " 2 / 220"
-                         :grid-row    2
-                         :z-index     5}
-             :type      "range"
-             :max       109
-             :value     guess
-             :on-change on-change
-             }]
-    (when target
-      (let [centre (* 2 (+ 1 target))]
-        [:<>
-         [:div {:style {:background-color "SeaGreen"
-                        :grid-row         "1 / 3"
-                        :grid-column      (str (max 1 (- centre 5)) " / " (min 221 (+ centre 5)))
-                        :width            "100%"
-                        :z-index          4}}]
-         [:div {:style {:background-color "Orange"
-                        :grid-row         "1 / 3"
-                        :grid-column      (str (max 1 (- centre 15)) " / " (min 221 (+ centre 15)))
-                        :width            "100%"
-                        :z-index          3}}]
-         [:div {:style {:background-color "FireBrick"
-                        :grid-row         "1 / 3"
-                        :grid-column      (str (max 1 (- centre 25)) " / " (min 221 (+ centre 25)))
-                        :width            "100%"
-                        :z-index          2
-                        :border-radius "5px"}}]]))]])
+  (let [range-max  110
+        slider-max (dec range-max)
+        grid-size  (* 2 slider-max)
+        grid-min   1
+        grid-max   (inc grid-size)
+        centre     (when target (+ 1 (* 2 target)))]
+    [:div.center-grid.cols-3
+     [:p.gr1.gc1 (first wavelength)]
+     [:p.gr1.gc3 (second wavelength)]
+     [:div.center-grid.gr2.gc1-4.fw
+
+      [:div.fw.gr1.gc1 {:style {:z-index 5
+                                :height  "25px"}}
+       [:input.slider {:style     {:width "100%"}
+                       :type      "range"
+                       :max       slider-max
+                       :value     guess
+                       :on-change on-change}]]
+      [:div.fw.gr1.gc1
+       {:style {:padding-left #_"5px"  "6px"
+                :padding-right #_"5px" "4px"
+                ;; no idea why these are the numbers that look right
+
+                ;; make padding shrink the content rather than expand it
+                :box-sizing            "border-box"
+                :height                "20px"}}
+       [:div.center-grid
+        {:style {:height                "100%"
+                 :grid-template-columns (str "repeat(" grid-size ", 1fr)")}}
+        (when target
+          [:<>
+           [:div {:style {:background-color "SeaGreen"
+                          :grid-row         "1 / 3"
+                          :grid-column      (str (max grid-min (- centre 5)) " / " (min grid-max (+ centre 5)))
+                          :width            "100%"
+                          :z-index          4}}]
+           [:div {:style {:background-color "Orange"
+                          :grid-row         "1 / 3"
+                          :grid-column      (str (max grid-min (- centre 15)) " / " (min grid-max (+ centre 15)))
+                          :width            "100%"
+                          :z-index          3}}]
+           (let [left-side (- centre 25)]
+             [:div {:style {:background-color "FireBrick"
+                            :grid-row         "1 / 3"
+                            :grid-column      (str (max grid-min left-side) " / " centre)
+                            :width            "100%"
+                            :z-index          2
+                            :border-radius    (when (> left-side grid-min) "5px")}}])
+           (let [right-side (+ centre 25)]
+             [:div {:style {:background-color "FireBrick"
+                            :grid-row         "1 / 3"
+                            :grid-column      (str centre " / " (min grid-max right-side))
+                            :width            "100%"
+                            :z-index          2
+                            :border-radius    (when (< right-side grid-max) "5px")}}])])]]]]))
 
 (defn psychics-clue
   [name clue]
@@ -197,7 +218,7 @@
            waiting-name (-> team-turn other-team team-name) ]
        [:<>
         [psychics-clue psychic clue]
-        [thinger wavelength nil guess target nil]
+        [target-slider wavelength nil guess target nil]
         #_[:h3 "Result"]
         [:p.txt-c
          (str active-name " scored " active-score " points")]
@@ -264,7 +285,7 @@
     (fn []
       [:<>
        #_[:h2 "Pick clue"]
-       [thinger wavelength "" target target nil]
+       [target-slider wavelength "" target target nil]
        [:p.txt-c "Enter a clue that represents where on the wavelength the target sits"]
        [:p.txt-c "Remember you not are not allowed to communicate with your team after this point!"]
        [:div.center-grid.cols-1
@@ -286,7 +307,7 @@
     (fn [guess]
       (reset! slider guess)
       [:<>
-       [thinger wavelength nil guess nil (fn [x]
+       [target-slider wavelength nil guess nil (fn [x]
                                            (let [x (js/parseInt (.. x -target -value))]
                                              (put! send-chan {:type :move-guess :guess x})))]
        [:div.center-grid.cols-3
@@ -299,7 +320,7 @@
   [msg]
   (let [{:keys [guess wavelength]} (:game-state @state)]
     [:<>
-     [thinger wavelength nil guess nil]
+     [target-slider wavelength nil guess nil]
      [:p.txt-c msg]]))
 
 (defn team-guess
@@ -329,10 +350,8 @@
     [:div
      #_[:h2 "Left-Right Phase"]
      [psychics-clue psychic clue]
+     [target-slider wavelength "" guess]
      [:div.center-grid.cols-3
-      [:p.gr1.gc1 (first wavelength)]
-      [:p.gr1.gc3 (second wavelength)]
-      [:input.gr2.gc1-4.fw {:type "range" :value guess :max 110}]
       (when (= :waiting role)
         [:<>
          [:button.gr3.gc1
@@ -362,7 +381,6 @@
 
 (defn app
   []
-  ;[:div {:style {:max-width 1280 :center true :margin "auto"}}
    (let [s (:game-state @state)]
      (case (:mode s)
        nil [create-room]
@@ -375,9 +393,7 @@
        :reveal [reveal]
        [:div
         [:h2 "Eh?"]
-        [dump-state]]))
-   ;]
-  )
+        [dump-state]])))
 
 (dom/render [app]
           (. js/document (getElementById "container")))
