@@ -59,9 +59,22 @@
         (do
           (send-msg-loop ws-channel)
           (receive-msg-loop ws-channel nickname)
-          ;; Keep this since the creator of the lobby doesn't currently get sent their nickname
+          ;; TODO can we remove this now that the server sends the nickname over now
           (swap! state assoc :game-state {:nickname nickname :mode :team-lobby}))
         (swap! state assoc :error error)))))
+
+(defn footer
+  []
+  [:<>
+   [:hr]
+   [:div.center-grid.cols-1
+    [:p {:style {:color "grey"}}
+     "Based on the boardgame " [:a {:href "https://www.wavelength.zone/"} "Wavelength"]
+     [:br]
+     [:a {:href "https://www.ultraboardgames.com/wavelength/game-rules.php"} "How to Play"]
+     [:br]
+     "Source code on " [:a {:href " https://github.com/guess-burger/wavelength"} "Github"]]
+    ]])
 
 (defn create-room []
   (let [nickname (atom "")
@@ -83,7 +96,8 @@
                       :type    "text"
                       :onInput (fn [x] (->> x .-target .-value (reset! room)))}]
         [:button {:on-click #(connect-to-server url @nickname @room)}
-         "Submit"]]])))
+         "Submit"]]
+       [footer]])))
 
 (defn dump-state []
   [:<>
@@ -122,8 +136,7 @@
        [:button {:disabled (not ready)
                  :on-click (fn [] (put! send-chan {:type :start}))}
         "Start Game"]]]
-     #_(for [[k v] (dissoc (:game-state @state) :room-code :left :right :spectators :nickname)]
-       [:p (str k " -> " v)])]))
+     [footer]]))
 
 (def ^:private team-name
   {:left "Left Brain"
@@ -209,6 +222,17 @@
   {:left  :right
    :right :left})
 
+(defn title
+  [game-state]
+  [:div.center-grid.cols-3.fw
+   [:h1.gc2 "Wavelength"]
+   (when-let [room-code (:room-code game-state)]
+     [:p.gc3
+      {:style {:text-align "right"
+               :width      "100%"
+               :color      "grey"}}
+      (str "Room: " room-code)])])
+
 (defn waiting-screen
   [{:keys [team-turn result wavelength] :as game-state} content]
   [:<>
@@ -237,6 +261,7 @@
 (defn pick-psychic []
   (let [{:keys [team-turn active result wavelength] :as gs} (:game-state @state)]
     [:<>
+     [title gs]
      #_[:h2 "Pick Psychic"]
      [waiting-screen
       gs
@@ -247,6 +272,7 @@
           [:button {:on-click #(put! send-chan {:type :pick-psychic})}
            "Become The Psychic"]]
          [:p (str "Wait while " (team-name team-turn) " chooses their Psychic")])]]
+     [footer]
      #_[dump-state]]))
 
 
@@ -254,16 +280,17 @@
   (let [{:keys [team-turn role wavelengths psychic] :as gs} (:game-state @state)
         [opt1 opt2] wavelengths]
     [:<>
+     [title gs]
      #_[:h2 "Pick Wavelength"]
      (if (= :psychic role)
        [:<>
         [:div.center-grid.cols-2
          [:p.gc1-3 "Pick a Wavelength for your team to guess on"]
-         [:p (str (first opt1) " <--> " (second opt1))]
+         [:p (str (first opt1) " ⟷ " (second opt1))]
          [:button.gr3 {:on-click #(put! send-chan {:type :pick-card
                                                    :pick opt1})}
           "Pick"]
-         [:p (str (first opt2) " <--> " (second opt2))]
+         [:p (str (first opt2) " ⟷ " (second opt2))]
          [:button {:on-click #(put! send-chan {:type :pick-card
                                                :pick opt2})}
           "Pick"]
@@ -276,6 +303,7 @@
                     (str psychic " is choosing a wavelength for " (team-name team-turn) " to guess"))]
           [:<>
            [:p msg]])])
+     [footer]
      #_[dump-state]]))
 
 (defn pick-clue
@@ -284,6 +312,7 @@
         clue (atom "")]
     (fn []
       [:<>
+       [title gs]
        #_[:h2 "Pick clue"]
        [target-slider wavelength "" target target nil]
        [:p.txt-c "Enter a clue that represents where on the wavelength the target sits"]
@@ -298,7 +327,8 @@
                        :onInput (fn [x] (->> x .-target .-value (reset! clue)))}]
          [:input {:type  "submit"
                   :value "Submit"}]]]
-       [team-view gs]])))
+       [team-view gs]
+       [footer]])))
 
 (defn team-guess-guesser
   [guess]
@@ -328,6 +358,7 @@
   (let [{:keys [active role team-turn guess clue psychic] :as gs} (:game-state @state)
         safe-role (when active role)]
     [:<>
+     [title gs]
      #_[:h2 "Team Guess"]
      [psychics-clue psychic clue]
      (case safe-role
@@ -336,6 +367,7 @@
        nil [team-guess-listener (str (team-name team-turn)
                                      " is discussing their clue and picking where on the wavelength they think it fits")])
      [team-view gs]
+     [footer]
      #_[dump-state]]))
 
 (defn left-right
@@ -348,6 +380,7 @@
                         (str waiting-name
                              " is deciding whether the target is left or right of " active-name "'s guess")))]
     [:div
+     [title gs]
      #_[:h2 "Left-Right Phase"]
      [psychics-clue psychic clue]
      [target-slider wavelength "" guess]
@@ -362,6 +395,7 @@
           "Right"]])
       [:p.gr4.gc1-4 explanation]]
      [team-view gs]
+     [footer]
      #_[dump-state]]))
 
 (defn reveal
@@ -377,6 +411,7 @@
        [:button {:disabled (= :spectator role)
                  :on-click #(put! send-chan {:type :change-teams})}
         "Change Teams"]]]
+     [footer]
      #_[dump-state]]))
 
 (defn app
