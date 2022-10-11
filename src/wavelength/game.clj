@@ -6,6 +6,8 @@
    [clojure.edn :as edn]
    [lib.stately.core :as st]))
 
+(defonce lobbies (atom {}))
+
 (def score-block-size 5)
 (def board-range (* 22 score-block-size))
 
@@ -38,6 +40,28 @@
   [{:keys [lobby left spectators right]}]
   (concat (keys left) (keys spectators) (keys right) [lobby]))
 
+(defn ^:private find+remove-player
+  [player context team-k]
+  (let [team (get context team-k)]
+    (if (contains? team player)
+      (reduced [(assoc context team-k (dissoc team player))
+                team-k
+                (get team player)])
+      context)))
+
+(defn remove-player-from
+  "Remove a player if present in the given teams, returning vec of player name,
+   team-k and the new context if found otherwise just vec containing context"
+  ([context player]
+   (remove-player-from context player [:left :right :spectators]))
+  ([context player team-ks]
+   (let [result (reduce (partial find+remove-player player) context team-ks)]
+     ;; if not a vector then we failed to find the player so return context/vector
+     ;; in a vector
+     (if (vector? result)
+       result
+       [result]))))
+
 ;; -- Lobby
 ;; A holding area where players join as spectators before picking the team they wish to play in.
 ;; the match can only begin when there are at least 2 players in each team
@@ -47,25 +71,20 @@
   (and (<= 2 (count left))
        (<= 2 (count right))))
 
+(defmethod st/apply-effect ::close-lobby [[_k code]]
+  (swap! lobbies dissoc code))
+
 (defn- leave-lobby
-  [who {:keys [left spectators right] :as context}]
-  (let [left (dissoc left who)
-        spectators (dissoc spectators who)
-        right (dissoc right who)
-        context (assoc context
-                       :left left
-                       :spectators spectators
-                       :right right)
-        ready (ready? context)
-        ;; FIXME this could use the remove thing from joining a team
-        out-msg {:type       :merge
-                 :left       (vals left)
-                 :spectators (vals spectators)
-                 :right      (vals right)
-                 :ready      ready}
-        members (concat (keys left) (keys spectators) (keys right))]
+  [who {:keys [code] :as context}]
+  (let [[context team-k _] (remove-player-from context who)
+        out-msg {:type  :merge
+                 team-k (vals (get context team-k))
+                 :ready (ready? context)}
+        members (all-players context)]
     (if (empty? members)
-      {::st/state ::st/end}
+      (do
+        {::st/state ::st/end
+         ::st/fx    {::close-lobby code}})
       {::st/state   ::st/recur
        ::st/context context
        ::st/fx      {::st/send [{::st/msg out-msg
@@ -103,28 +122,11 @@
                               {::st/to  [joiner]
                                ::st/msg joiner-msg}]}}))
 
-(defn- find+remove-player
-  [player context team-k]
-  (let [team (get context team-k)]
-    (println {:k team-k :p player :t team})
-    (if (contains? team player)
-      (reduced [(get team player) team-k (assoc context team-k (dissoc team player))])
-      context)))
-
-;; TODO should put some tests on this of it's being reused now
-(defn remove-player-from
-  "Remove a player if present in the given teams, returning vec of
-   player name, team-k and the new context if found otherwise just context"
-  ([context player]
-   (remove-player-from context player [:left :right :spectators]))
-  ([context player team-ks]
-   (reduce (partial find+remove-player player) context team-ks)))
-
 (defn- pick-team
   [context {:keys [team] :as _msg} player]
   #_(println "pick-team" team)
   (if (#{:left :right :spectators} team)
-    (let [[nickname old-team context'] (remove-player-from context player)]
+    (let [[context' old-team nickname] (remove-player-from context player)]
       (if-not (= team old-team)
         (let [context' (update context' team assoc player nickname)
               out-msg (assoc {:type :merge
@@ -220,9 +222,7 @@
 
 (defn ^:private remove-player
   [context player]
-  ;; FIXME does this function really work for every phase?
-  ;; some of the phases are using :rest-of-team which isn't being updated
-  (let [[name team-k next-context] (remove-player-from context player)]
+  (let [[next-context team-k name] (remove-player-from context player)]
     (cond
       ;; too few players: go back to lobby
       (or (> 2 (-> next-context :left count))
@@ -249,7 +249,7 @@
     [psychic active waiting (keys spectators)]))
 
 (defn pick-psychic
-  [from {:keys [active-team waiting-team deck] :as context}]
+  [from {:keys [active-team deck] :as context}]
   (println (assoc context :deck "<infinite!>"))
   ;; FIXME might need some print-fn for the context to prevent stately printing infinite seqs
 
@@ -298,7 +298,6 @@
     (and (= from lobby) (= :join (:type msg)))
     (join-from-lobby pick-psychic-spectator-join msg context)
 
-    ;; TODO: should pick just be in place here since this is only the pick-psychic transitions?
     (= :pick-psychic (:type msg))
     (pick-psychic from context)
 
@@ -383,10 +382,7 @@
                                ::st/msg {:type       :merge
                                          :mode       :pick-clue
                                          :target     target
-                                         :wavelength wavelength}}
-                              ;; TODO could send a message to others to update them on
-                              ;; picking a clue
-                              ]}}))
+                                         :wavelength wavelength}}]}}))
 
 (defn pick-clue-transitions
   [[msg from] {:keys [psychic lobby] :as context}]
@@ -470,7 +466,6 @@
 (defn left-right-spectator-join
   [context]
   (-> (team-guess-spectator-join context)
-      ;; FIXME is there a load of stuff for sudden death that is needed?
       (assoc :mode :left-right)))
 
 (defn left-right-transitions
@@ -486,8 +481,7 @@
     (and (= :pick-lr (:type msg))
          (#{:left :right} (:guess msg))
          (contains? (get context (:waiting-team context)) from))
-    (let [;context (assoc context :lr-guess (:guess msg))
-          {:keys [target guess active-team waiting-team score psychic sudden-death-rounds]} context
+    (let [{:keys [target guess active-team waiting-team score psychic sudden-death-rounds]} context
 
           lr-guess    (:guess msg)
           guess-score (condp >= (abs (- target guess))
@@ -569,7 +563,7 @@
                                                         :winner (first winner)})]}}))
 
 (defn- reveal-spectator-join
-  [{:keys [score] :as context}]
+  [{:keys [score] :as _context}]
   {:mode :reveal
    :score score
    :winner (first (max-key second (first score) (second score)))})
@@ -634,8 +628,6 @@
    ::reveal          {::st/on-entry       #'reveal-on-entry
                       ::st/inputs         #'all-inputs
                       ::st/transition-fn  #'reveal-transitions}})
-
-(defonce lobbies (atom {}))
 
 (defn ^:private rand-str [len]
   (apply str (take len (repeatedly #(char (+ (rand 26) 65))))))

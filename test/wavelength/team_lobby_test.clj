@@ -65,6 +65,23 @@
                [msg :the-lobby] context))))))
 
 (deftest leave-lobby
+  (let [context {:left       {:baz "baz"},
+                 :spectators {:foo "foo"},
+                 :right      {:bar "bar", :qux "qux"},
+                 :code       "lobby-code",
+                 :lobby      :the-lobby}]
+    (is (= #::st{:state   ::st/recur,
+                 :context {:left       {:baz "baz"},
+                           :spectators {:foo "foo"},
+                           :right      {:qux "qux"},
+                           :code       "lobby-code",
+                           :lobby      :the-lobby},
+                 :fx      #::st{:send [#::st{:msg {:type       :merge
+                                                   :ready      false
+                                                   :right      ["qux"]}
+                                             :to  [:baz :foo :qux]}]}}
+           (sut/wait-in-lobby-transitions [nil :bar] context))))
+
   (let [context {:left       {},
                  :spectators {:foo "foo", :bar "bar"},
                  :right      {},
@@ -78,9 +95,7 @@
                            :lobby      :the-lobby},
                  :fx      #::st{:send [#::st{:msg {:type       :merge
                                                    :ready      false
-                                                   :left       nil
-                                                   :spectators ["foo"]
-                                                   :right      nil}
+                                                   :spectators ["foo"]}
                                              :to  [:foo]}]}}
            (sut/wait-in-lobby-transitions [nil :bar] context))))
 
@@ -89,7 +104,8 @@
                  :right      {}
                  :code       "lobby-code"
                  :lobby      :the-lobby}]
-    (is (= #::st{:state ::st/end}
+    (is (= #::st{:state ::st/end
+                 :fx    #:wavelength.game{:close-lobby "lobby-code"}}
            (sut/wait-in-lobby-transitions [nil :foo] context)))))
 
 
