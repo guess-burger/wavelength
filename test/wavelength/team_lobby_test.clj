@@ -3,8 +3,6 @@
             [lib.stately.core :as st]
             [wavelength.game :as sut]))
 
-
-
 (deftest join-test
   (testing "joining a 'fresh' lobby"
     (let [context {:left       {}
@@ -55,11 +53,12 @@
                                                      :type       :merge}
                                                :to  [:foo :bar]}
                                          #::st{:msg {:left       []
-                                                     :mode       :team-lobby
                                                      :right      []
-                                                     :room-code  "lobby-code"
                                                      :spectators ["foo" "bar" "baz"]
-                                                     :type       :merge}
+                                                     :nickname   "baz"
+                                                     :mode       :team-lobby
+                                                     :room-code  "lobby-code"
+                                                     :type       :reset}
                                                :to  [:baz]}]}
                                 :state   ::st/recur}
              (sut/wait-in-lobby-transitions
