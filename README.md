@@ -1,62 +1,38 @@
-# wavelength
+# Wavelength
 
-FIXME: my new application.
+A simple online port of the [Wavelength board game](https://www.wavelength.zone/).
 
+You can [try it online](https://mysterious-basin-71031.herokuapp.com/)...at least until
+Heroku Free is tier is shutdown :cry:
 
-## Running
+This project was originally a way to get more familiar with Clojure core.async.
+If you are interest, you can read more about that elsewhere in this project.
 
-Spin up a repl using `clj -M:repl/run` and that _should_ start the server on 8080
+## Running Locally
 
-You probably need a cljs build step _somewhere_ but using `clj -M:repl/fig` for now to run fig-wheel
+```bash
+# Build the ClojureScript (first time only)
+clj -M:fig/build 
+# Run the Server
+clj -M:run 
+```
+This starts the server on port 8080 by default and will allow you to play the game.
 
-## TODO
+### Local Development
 
-### NEXT
-* [X] Psychic Phase
-  * [X] Pick a psychic
-    * [X] disconnects (to fix the disconnects bug). Go back to pick
-  * [X] let them pick a card
-  * [X] let them add a clue
-* [X] Guessing Phase
-* [X] L/R Phase
-* [X] Figure out scores and move on to the next round
-* [X] Make it look a little better
-* [X] Figure out if someone has won
-  * [X] play again
-  * [X] change teams
-* [X] Sudden death
-* [X] Quit/rejoin state bugs (so far)
-* [X] Heroku?
-  * deploying
-  * keeping the ws alive for longer than 1min
-* [X] a separate style sheet
-  * [X] maybe even a container div
-* [X] Allow spectators to join mid-game
-* [_] Clean up and document stately
-* [_] Something more stylish 
-* [_] Make a custom slider
-  * [_] Or maybe just make the on we have less "wonky"
+If you would to run the game through a REPL then run `clj -A:dev` and `clj -M:fig/repl`
+in separate terminals.
 
+Inside `dev/dev.clj`, you'll find some helper functions to rebuild the "Wavelengths" used
+in this game by using the hard work done by another port, [Telewave](https://github.com/gjeuken/telewave).
 
-### Things to keep an eye on
+## Building for Heroku
 
+This makes use of [cap10morgan's tools.deps fork](https://github.com/cap10morgan/heroku-buildpack-clojure/tree/feature/tools-deps-cli) of the standard Heroku Clojure buildpack.
 
-### Bugs
-
-* No inputs to stately cause hot-loop if there is a default that recurs
-  * I mean what does it mean have to have no inputs... that seems an error
-  * Actually... is it that the real problem or it that it now null since they are closed
-    * probably need to figure out leaving asap and make it reusable 
-* Deck is an infinite sequence that which is fine until println tries to walk the entire thing
-  * Will a logging framework make the same mistake? How can you get around it? 
-  * Logging frameworks don't handle this!!
-* Long wavelength prompts render a bit strange (GH issue #2)
-* Slider is totally wonky and off the further up the bar you go
-
-...
 
 ## License
 
-Copyright © 2022 Gavinesberger
+Copyright © 2022 guess-burger
 
 Distributed under the Eclipse Public License version 1.0.
