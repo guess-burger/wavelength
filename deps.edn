@@ -1,16 +1,21 @@
 {:paths ["src" "src-cljs" "resources"]
- :deps  {org.clojure/clojure       {:mvn/version "1.11.1"}
+ :deps  {org.clojure/core.async    {:mvn/version "1.5.648"}
+         jarohen/chord             {:mvn/version "0.8.1"
+                                    :exclusions  [org.clojure/core.async]}
+
+         org.clojure/clojure            {:mvn/version "1.11.1"}
+         org.clojure/tools.logging      {:mvn/version "1.2.4"}
+         http-kit/http-kit              {:mvn/version "2.5.3"}
+         compojure/compojure            {:mvn/version "1.6.2"}
+         ring/ring-defaults             {:mvn/version "0.3.3"}
+         hiccup/hiccup                  {:mvn/version "1.0.5"}   ;; included in reagent
+         org.slf4j/slf4j-api            {:mvn/version "1.7.36"}
+         ch.qos.logback/logback-classic {:mvn/version "1.2.11"}
+
          org.clojure/clojurescript {:mvn/version "1.11.4"}
-         http-kit/http-kit         {:mvn/version "2.5.3"}
-         compojure/compojure       {:mvn/version "1.6.2"}
-         ring/ring-defaults        {:mvn/version "0.3.3"}
-         hiccup/hiccup             {:mvn/version "1.0.5"}   ;; included in reagent
          reagent/reagent           {:mvn/version "1.1.0"}
          cljsjs/react              {:mvn/version "17.0.2-0"}
-         cljsjs/react-dom          {:mvn/version "17.0.2-0"}
-         org.clojure/core.async    {:mvn/version "1.5.648"}
-         jarohen/chord             {:mvn/version "0.8.1"
-                                    :exclusions  [org.clojure/core.async]}}
+         cljsjs/react-dom          {:mvn/version "17.0.2-0"}}
  :aliases
  {:dev       {:extra-paths ["dev"]}
 

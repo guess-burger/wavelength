@@ -2,8 +2,9 @@
   (:require
    ;; TODO see if we can remove core.asycn from here
    [clojure.core.async :as as]
-   [clojure.java.io :as io]
    [clojure.edn :as edn]
+   [clojure.java.io :as io]
+   [clojure.tools.logging :as log]
    [lib.stately.core :as st]))
 
 (defonce lobbies (atom {}))
@@ -27,7 +28,7 @@
 
 (defn ignore+recur
   [context]
-  #_(println "ignoring")
+  (log/info "ignoring")
   {::st/state   ::st/recur
    ::st/context context})
 
@@ -124,7 +125,6 @@
 
 (defn- pick-team
   [context {:keys [team] :as _msg} player]
-  #_(println "pick-team" team)
   (if (#{:left :right :spectators} team)
     (let [[context' old-team nickname] (remove-player-from context player)]
       (if-not (= team old-team)
@@ -645,7 +645,9 @@
              :spectators {ws-ch nickname}
              :right      {}
              :code       lobby-code
-             :lobby      lobby-ch})))
+             :lobby      lobby-ch}
+            ;; Need to not attempt to print deck as it's an infinite sequence
+            {:context-fmt #(dissoc % :deck )})))
 
 (defn ^:private join-lobby
   [ws-ch nickname lobby-ch]
