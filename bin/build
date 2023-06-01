@@ -1,4 +1,0 @@
-#!/usr/bin/env sh
-
-# Pre-build the js to be included in the built jar
-clojure -M:fig/build
