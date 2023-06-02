@@ -16,14 +16,21 @@
          reagent/reagent           {:mvn/version "1.1.0"}
          cljsjs/react              {:mvn/version "17.0.2-0"}
          cljsjs/react-dom          {:mvn/version "17.0.2-0"}}
+
  :aliases
  {:dev       {:extra-paths ["dev"]}
 
   :run       {:main-opts ["-m" "wavelength.main"]}
 
-  :fig/repl  {:extra-deps {com.bhauman/figwheel-main       {:mvn/version "0.2.16"}
-                           com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
-              :main-opts  ["-m" "figwheel.main" "-b" "dev" "-r"]}
+  :fig {:extra-deps {com.bhauman/figwheel-main {:mvn/version "0.2.17"}
+                     com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}
+                     org.slf4j/slf4j-nop {:mvn/version "1.7.30"}}
+        :extra-paths ["target" "test"]}
+  ;; -M:fig:repl
+  :repl {:main-opts ["-m" "figwheel.main" "-b" "dev" "-r"]}
+  ;; -M:fig:min
+  :min   {:main-opts ["-m" "figwheel.main" "-O" "advanced" "-bo" "dev"]}
 
-  :fig/build {:extra-deps {com.bhauman/figwheel-main {:mvn/version "0.2.16"}}
-              :main-opts  ["-m" "figwheel.main" "-O" "simple" "--build-once" "dev"]}}}
+  :build {:deps {io.github.clojure/tools.build {:mvn/version "0.9.4"}}
+          :ns-default build}}
+ }

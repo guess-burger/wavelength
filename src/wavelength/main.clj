@@ -20,7 +20,7 @@
      [:link {:rel "stylesheet" :href (hcu/to-uri "/main.css")}]]
     [:body
      [:div#container]
-     [:script {:type "text/javascript", :src (hcu/to-uri "/js/main.js")}]]))
+     [:script {:type "text/javascript", :src (hcu/to-uri "/main.js")}]]))
 
 ;; Bidi from Chord but into a record rather than reified
 (defrecord Bidi [read-ch write-ch on-close]
