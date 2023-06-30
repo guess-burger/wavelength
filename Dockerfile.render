@@ -1,0 +1,26 @@
+FROM clojure:temurin-20-tools-deps AS builder
+
+RUN mkdir -p /build
+WORKDIR /build
+
+COPY deps.edn /build/
+RUN clojure -P -X:build:fig:min
+
+COPY ./ /build
+RUN clojure -T:build uber
+
+FROM eclipse-temurin:20-jre-jammy AS runner
+
+RUN apt-get update && \
+    apt-get install -y dumb-init
+
+COPY --from=builder --chown=1000:1000 /build/target/wavelength-standalone.jar /app/wavelength-standalone.jar
+
+USER 1000:1000
+WORKDIR /app
+
+ENV JDK_JAVA_OPTIONS "-XshowSettings:system -XX:+UseContainerSupport -XX:MaxRAMPercentage=85"
+EXPOSE 8080
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["java", "-jar", "/app/wavelength-standalone.jar"]
