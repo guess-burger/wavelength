@@ -3,6 +3,8 @@
     justify-items: center;
 }
 
+.a-start { align-items: start; }
+
 .cols-1 { grid-template-columns: 1fr }
 .cols-2 { grid-template-columns: repeat(2, 1fr) }
 .cols-3 { grid-template-columns: repeat(3, 1fr) }
@@ -23,6 +25,11 @@
 .txt-c { text-align: center}
 
 .fw { width: 100%}
+
+.mn-h-250 { min-height: 250px; }
+
+.m1 { margin: 1em;}
+
 
 #container {
     max-width: 1280;

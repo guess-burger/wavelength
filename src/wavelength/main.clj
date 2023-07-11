@@ -13,11 +13,13 @@
   (:gen-class)
   (:import (java.io Writer)))
 
-(defn index-page []
+(defn index-page [room-found]
   (hc/html
     [:head
      [:title "Wavelength"]
-     [:link {:rel "stylesheet" :href (hcu/to-uri "/main.css")}]]
+     [:link {:rel "stylesheet" :href (hcu/to-uri "/main.css")}]
+     (when (some? room-found)
+       [:meta {:name "room-found" :content (str room-found)}])]
     [:body
      [:div#container]
      [:script {:type "text/javascript", :src (hcu/to-uri "/main.js")}]]))
@@ -64,7 +66,10 @@
       (game/create-or-join-lobby ch nickname room-code))))
 
 (defroutes main-routes
-  (GET "/" [] (index-page))
+  (GET "/" [] (index-page nil))
+  (GET "/room/:room-code" [room-code]
+    (let [room (get @game/lobbies room-code)]
+      (index-page (some? room))))
   (GET "/lobby" [nickname room :as req] (ws-handler nickname room req))
   (route/resources "/")
   (route/not-found "Page not found"))

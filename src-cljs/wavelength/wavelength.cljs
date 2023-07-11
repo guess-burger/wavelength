@@ -29,11 +29,10 @@
           (recur))))))
 
 (defn receive-msg-loop
-  [svr-chan nickname]
+  [svr-chan]
   (go-loop []
      (if-let [new-msg (:message (<! svr-chan))]
        (do
-         (println nickname " got: " new-msg)
          (case  (:type new-msg)
            :reset
            (swap! state assoc :game-state (dissoc new-msg :type))
@@ -47,6 +46,16 @@
          (js/console.log "Websocket closed")
          (reset! state {})))))
 
+(defn first-receive-then-loop
+  [svr-chan]
+  (go
+    (if-let [new-msg (:message (<! svr-chan))]
+      (let [room-code (:room-code new-msg)]
+        (.pushState js/history {}, "", (str "/room/" room-code))
+        ;; just merge the first message
+        (swap! state update :game-state merge (dissoc new-msg :type))
+        ;; then enter the loop
+        (receive-msg-loop svr-chan)))))
 
 (defn- append-params
   [url params]
@@ -58,8 +67,10 @@
       (if-not error
         (do
           (send-msg-loop ws-channel)
-          (receive-msg-loop ws-channel nickname)
+          (first-receive-then-loop ws-channel)
+
           ;; TODO can we remove this now that the server sends the nickname over now
+          ;;  no, because nickname isn't sent on create-lobby
           (swap! state assoc :game-state {:nickname nickname :mode :team-lobby}))
         (swap! state assoc :error error)))))
 
@@ -76,28 +87,58 @@
      "Source code on " [:a {:href " https://github.com/guess-burger/wavelength"} "Github"]]
     ]])
 
-(defn create-room []
+(defn common-create-join [join? room-code]
   (let [nickname (atom "")
-        room     (atom "")
+        room     (r/atom (or room-code ""))
         url      (-> (.. js/document -location -origin)
                      (str/replace #"^http" "ws")
                      (str "/lobby"))]
-    (fn []
+    (fn [_join? _room-code]
       [:<>
-             [:div.center-grid.cols-1
+       [:div.center-grid.cols-1.mn-h-250.a-start
         [:h1 "Wavelength"]
 
         [:label {:for "nickname"} "Nickname"]
-        [:input#nickname {:style   {:margin-bottom "1em"}
-                          :type    "text"
-                          :onInput (fn [x] (->> x .-target .-value (reset! nickname)))}]
-        [:label {:for "room"} "Room Code"]
-        [:input#room {:style   {:margin-bottom "1em"}
-                      :type    "text"
-                      :onInput (fn [x] (->> x .-target .-value (reset! room)))}]
-        [:button {:on-click #(connect-to-server url @nickname @room)}
-         "Submit"]]
+        [:input#nickname {:style    {:margin-bottom "1em"}
+                          :type     "text"
+                          :on-input (fn [x] (->> x .-target .-value (reset! nickname)))}]
+        (when join?
+          [:<>
+           [:label {:for "room"} "Room Code"]
+           [:input#room {:style    {:margin-bottom "1em"}
+                         :type     "text"
+                         :disabled (some? room-code)
+                         :value    @room
+                         :on-input (fn [x] (->> x .-target .-value (reset! room)))}]])
+        [:div.center-grid.cols-2
+         [:button.m1 {:on-click #(connect-to-server url @nickname @room)}
+          "Submit"]
+         [:button.m1 {:on-click (fn [_]
+                                  ;; change the url back to root
+                                  (.pushState js/history {}, "", "/")
+                                  (reset! state nil))}
+          "Cancel"]]]
        [footer]])))
+
+(defn create-room []
+  [common-create-join])
+
+(defn join-room []
+  (let [{:keys [room-code]} (:game-state @state)]
+    [common-create-join true room-code]))
+
+(defn create-or-join []
+  [:<>
+   [:div.center-grid.cols-1.mn-h-250.a-start
+    [:h1 "Wavelength"]
+    [:div.center-grid.cols-2.fw
+     [:button
+      {:on-click (fn [_] (swap! state assoc :game-state {:mode :create-room}))}
+      "Create New Game"]
+     [:button
+      {:on-click (fn [_] (swap! state assoc :game-state {:mode :join-room}))}
+      "Join Game"]]]
+   [footer]])
 
 (defn dump-state []
   [:<>
@@ -128,7 +169,7 @@
      (when msg [:p.fw.txt-c msg])
      [:div.center-grid.cols-3
       [team-div "Left Brain" :left left 1]
-      [team-div (str "Spectator" (when-not (= 1 (count spectators)) "s")) :spectators spectators 2]
+      [team-div "Spectators" :spectators spectators 2]
       [team-div "Right Brain" :right right 3]
       [:div.gr4.gc2
        ;; using a div to stop the button expanding to fill grid
@@ -416,19 +457,33 @@
 
 (defn app
   []
-   (let [s (:game-state @state)]
-     (case (:mode s)
-       nil [create-room]
-       :team-lobby [team-lobby]
-       :pick-psychic [pick-psychic]
-       :pick-wavelength [pick-wavelength]
-       :pick-clue [pick-clue]
-       :team-guess [team-guess]
-       :left-right [left-right]
-       :reveal [reveal]
-       [:div
-        [:h2 "Eh?"]
-        [dump-state]])))
+  (let [s (:game-state @state)]
+    (case (:mode s)
+      nil [create-or-join]
+      :create-room [create-room]
+      :join-room [join-room]
+      :team-lobby [team-lobby]
+      :pick-psychic [pick-psychic]
+      :pick-wavelength [pick-wavelength]
+      :pick-clue [pick-clue]
+      :team-guess [team-guess]
+      :left-right [left-right]
+      :reveal [reveal]
+      [:div
+       [:h2 "Eh?"]
+       [dump-state]])))
 
-(dom/render [app]
-          (. js/document (getElementById "container")))
+
+;; Initialisation Code
+;; we check to see if the URL indicates whether the user is trying to join a room
+;; and if the meta says the room was valid at the time of loading the page
+;; and skip to the join room state if so.
+(let [path       (.. js/window -location -pathname)
+      [_ room-code] (re-matches #"/room/(\w+)" path)
+      room-found (some-> (.querySelector js/document "meta[name=\"room-found\"]")
+                         (.-content)
+                         (parse-boolean))]
+  (when (and room-code room-found)
+    (swap! state update :game-state assoc :mode :join-room :room-code room-code))
+  (dom/render [app]
+              (. js/document (getElementById "container"))))
