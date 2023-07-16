@@ -5,7 +5,7 @@ A simple online port of the [Wavelength board game](https://www.wavelength.zone/
 You can [try it online](https://mysterious-basin-71031.onrender.com)
 
 This project was originally a way to get more familiar with Clojure core.async.
-If you are interest, you can read more about that elsewhere in this project.
+If you are interest, you can read more about that [elsewhere in this project](src/lib/stately/README.md).
 
 ## Running Locally
 

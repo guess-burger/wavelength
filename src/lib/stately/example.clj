@@ -10,13 +10,16 @@
          (fn [[msg _sender] context]
            {::st/state   :bar
             ::st/context (update context :count + msg)})}
+
    :bar {::st/inputs
          (fn [context] [(:in context)])
 
          ::st/transition-fn
          (fn [[msg _sender] context]
            {::st/state   :baz
-            ::st/context (update context :count * msg)})}
+            ::st/context (update context :count * msg)
+            ::st/fx      {::custom-effect [1 :two "three"]}})}
+
    :baz {::st/inputs
          (fn [state] [(:in state)])
 
@@ -24,12 +27,14 @@
          (fn [[msg _ch] context]
            (let [count (- (:count context) msg)]
              {::st/state ::st/end
-              ;; is there any point with this context?
-              ;::st/context state
               ::st/fx    {::st/send [{::st/to  [(:out context)]
                                       ::st/msg count}]}}))}})
 
+(defmethod st/apply-effect ::custom-effect [params]
+  (println "I'm a custom effect" params))
+
 (comment
+
   (def in (as/chan))
   (def out (as/chan))
 
