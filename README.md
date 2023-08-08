@@ -4,8 +4,8 @@ A simple online port of the [Wavelength board game](https://www.wavelength.zone/
 
 You can [try it online](https://mysterious-basin-71031.onrender.com)
 
-This project was originally a way to get more familiar with Clojure core.async.
-If you are interest, you can read more about that [elsewhere in this project](src/lib/stately/README.md).
+This project was originally a way to get more familiar with Clojure `core.async`.
+If you are interested, you can read more about that [elsewhere in this project](src/lib/stately/README.md).
 
 ## Running Locally
 
@@ -27,7 +27,7 @@ in this game by using the hard work done by another port, [Telewave](https://git
 
 ### Uberjar
 
-An uberjar be produced containing `cljs` code via `clj -T:build uber`
+An uberjar is produced containing `cljs` code via `clj -T:build uber`
 
 ## Building for ~~Heroku~~ Render
 
